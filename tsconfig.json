@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2015",
+    "module": "commonjs",
+    "allowJs": false,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "src",
+    "removeComments": false,
+    "strict": true,
+    "alwaysStrict": true,
+    "moduleResolution": "node"
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "typedocOptions": {
+    "excludeExternals": true,
+    "excludeNotExported": true,
+    "excludePrivate": true,
+    "excludeProtected": true,
+    "inputFiles": ["lib/index.ts"],
+    "out": "docs"
+  }
+}

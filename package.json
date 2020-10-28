@@ -1,0 +1,27 @@
+{
+  "name": "image-meta",
+  "version": "0.0.0",
+  "description": "",
+  "repository": "nuxt-contrib/image-meta",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "siroc build",
+    "clean": "rm -rf dist docs",
+    "lint": "eslint --ext .ts,.js .",
+    "test": "yarn lint"
+  },
+  "devDependencies": {
+    "@nuxtjs/eslint-config-typescript": "^4.0.0",
+    "eslint": "^7.12.1",
+    "siroc": "^0.4.0",
+    "typescript": "^4.0.5"
+  },
+  "engines": {
+    "node": ">=10.18.0"
+  }
+}
