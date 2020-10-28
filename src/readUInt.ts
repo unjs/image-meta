@@ -6,5 +6,6 @@ export function readUInt (buffer: Buffer, bits: Bits, offset: number, isBigEndia
   offset = offset || 0
   const endian = isBigEndian ? 'BE' : 'LE'
   const methodName: MethodName = ('readUInt' + bits + endian) as MethodName
+  // eslint-disable-next-line no-useless-call
   return buffer[methodName].call(buffer, offset)
 }
