@@ -13,12 +13,14 @@
     "build": "siroc build",
     "clean": "rm -rf dist docs",
     "lint": "eslint --ext .ts,.js .",
+    "release": "yarn test && yarn build && standard-version && git push --follow-tags && npm publish",
     "test": "yarn lint"
   },
   "devDependencies": {
     "@nuxtjs/eslint-config-typescript": "^4.0.0",
     "eslint": "^7.12.1",
     "siroc": "^0.4.0",
+    "standard-version": "^9.0.0",
     "typescript": "^4.0.5"
   },
   "engines": {

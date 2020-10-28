@@ -30,7 +30,7 @@ function lookup (buffer: Buffer, filepath?: string): ISizeCalculationResult {
 /**
  * @param {Buffer|string} input - buffer of image data
  */
-export function imageSize (input: Buffer): ISizeCalculationResult | void {
+export default function imageMeta (input: Buffer): ISizeCalculationResult | void {
   // Handle buffer input
   if (Buffer.isBuffer(input)) {
     return lookup(input)
