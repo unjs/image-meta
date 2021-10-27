@@ -1,27 +1,30 @@
 {
   "name": "image-meta",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "",
   "repository": "nuxt-contrib/image-meta",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    "require": "./dist/index.cjs",
+    "import": "./dist/index.mjs"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "siroc build",
-    "clean": "rm -rf dist docs",
     "lint": "eslint --ext .ts,.js .",
-    "release": "yarn test && yarn build && standard-version && git push --follow-tags && npm publish",
+    "prepack": "unbuild",
+    "release": "yarn test && standard-version && git push --follow-tags && npm publish",
     "test": "yarn lint"
   },
   "devDependencies": {
-    "@nuxtjs/eslint-config-typescript": "^4.0.0",
-    "eslint": "^7.12.1",
-    "siroc": "^0.4.0",
-    "standard-version": "^9.0.0",
-    "typescript": "^4.0.5"
+    "@nuxtjs/eslint-config-typescript": "latest",
+    "eslint": "latest",
+    "unbuild": "latest",
+    "standard-version": "latest",
+    "typescript": "latest"
   },
   "engines": {
     "node": ">=10.18.0"

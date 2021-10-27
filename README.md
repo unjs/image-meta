@@ -20,7 +20,7 @@ npm install image-meta
 Usage:
 
 ```ts
-import imageMeta from 'image-meta'
+import { imageMeta } from 'image-meta'
 import fetch from 'node-fetch'
 
 const data = await fetch(url).then(res => res.buffer())
