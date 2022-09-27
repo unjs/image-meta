@@ -1,4 +1,4 @@
-import { IImage, ISize } from './interface'
+import type { IImage, ISize } from './interface'
 
 const PNMTypes: { [signature: string]: string } = {
   P1: 'pbm/ascii',

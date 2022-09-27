@@ -1,4 +1,4 @@
-import { IImage } from './interface'
+import type { IImage } from './interface'
 
 export const DDS: IImage = {
   validate (buffer) {

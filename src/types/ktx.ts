@@ -1,4 +1,4 @@
-import { IImage } from './interface'
+import type { IImage } from './interface'
 
 const SIGNATURE = 'KTX 11'
 

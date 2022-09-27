@@ -1,4 +1,4 @@
-import { IImage } from './interface'
+import type { IImage } from './interface'
 import { ICO } from './ico'
 
 const TYPE_CURSOR = 2

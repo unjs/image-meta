@@ -1,4 +1,4 @@
-import { IImage, ISize } from './interface'
+import type { IImage, ISize } from './interface'
 
 /**
  * ICNS Header
@@ -87,9 +87,9 @@ export const ICNS: IImage = {
     const fileLength = buffer.readUInt32BE(FILE_LENGTH_OFFSET)
     let imageOffset = SIZE_HEADER
 
-    let imageHeader = readImageHeader(buffer, imageOffset)
-    let imageSize = getImageSize(imageHeader[0])
-    imageOffset += imageHeader[1]
+    let [type, offset] = readImageHeader(buffer, imageOffset)
+    let imageSize = getImageSize(type)
+    imageOffset += offset
 
     if (imageOffset === fileLength) {
       return imageSize
@@ -102,9 +102,9 @@ export const ICNS: IImage = {
     }
 
     while (imageOffset < fileLength && imageOffset < bufferLength) {
-      imageHeader = readImageHeader(buffer, imageOffset)
-      imageSize = getImageSize(imageHeader[0])
-      imageOffset += imageHeader[1]
+      [type, offset] = readImageHeader(buffer, imageOffset)
+      imageSize = getImageSize(type)
+      imageOffset += offset
       result.images.push(imageSize)
     }
 

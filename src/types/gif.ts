@@ -1,4 +1,4 @@
-import { IImage } from './interface'
+import type { IImage } from './interface'
 
 const gifRegexp = /^GIF8[79]a/
 export const GIF: IImage = {

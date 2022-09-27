@@ -1,6 +1,6 @@
 import { typeHandlers, getMimeType } from './types'
 import { detector } from './detector'
-import { ISizeCalculationResult } from './types/interface'
+import type { IImageMeta } from './types/interface'
 
 /**
  * Return size information based on a buffer
@@ -9,7 +9,7 @@ import { ISizeCalculationResult } from './types/interface'
  * @param {String} filepath
  * @returns {Object}
  */
-function lookup (buffer: Buffer, filepath?: string): ISizeCalculationResult {
+function lookup (buffer: Buffer, filepath?: string): IImageMeta {
   // detect the file type.. don't rely on the extension
   const type = detector(buffer)
 
@@ -17,9 +17,11 @@ function lookup (buffer: Buffer, filepath?: string): ISizeCalculationResult {
   if (type && type in typeHandlers) {
     const size = typeHandlers[type].calculate(buffer, filepath)
     if (size !== undefined) {
-      size.type = type
-      size.mimeType = getMimeType(type)
-      return size
+      return {
+        ...size,
+        type,
+        mimeType: getMimeType(type)
+      }
     }
   }
 
@@ -28,9 +30,9 @@ function lookup (buffer: Buffer, filepath?: string): ISizeCalculationResult {
 }
 
 /**
- * @param {Buffer|string} input - buffer of image data
+ * @param {Buffer} input - buffer of image data
  */
-export function imageMeta (input: Buffer): ISizeCalculationResult | void {
+export function imageMeta (input: Buffer): IImageMeta {
   // Handle buffer input
   if (Buffer.isBuffer(input)) {
     return lookup(input)

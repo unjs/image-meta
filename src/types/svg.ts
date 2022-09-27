@@ -1,4 +1,4 @@
-import { IImage, ISize } from './interface'
+import type { IImage, ISize } from './interface'
 
 interface IAttributes {
   width: number | null
