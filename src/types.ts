@@ -15,6 +15,7 @@ import { PNM } from './types/pnm'
 import { PSD } from './types/psd'
 import { SVG } from './types/svg'
 import { WEBP } from './types/webp'
+import { TIFF } from './types/tiff'
 
 export const typeHandlers: { [key: string]: IImage} = {
   bmp: BMP,
@@ -31,7 +32,8 @@ export const typeHandlers: { [key: string]: IImage} = {
   pnm: PNM,
   psd: PSD,
   svg: SVG,
-  webp: WEBP
+  webp: WEBP,
+  tiff: TIFF
 }
 
 export const getMimeType = (type: string) => {
