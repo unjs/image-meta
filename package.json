@@ -27,6 +27,6 @@
     "typescript": "latest"
   },
   "engines": {
-    "node": ">=10.18.0"
+    "node": ">=18.18.2"
   }
 }
