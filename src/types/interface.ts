@@ -1,16 +1,15 @@
-export interface ISize {
-  width: number | undefined
-  height: number | undefined
-  orientation?: number
-  type?: string
-  mimeType?: string
-}
+export type ImageMeta = {
+  images?: Omit<ImageMeta, "images">[];
 
-export interface ISizeCalculationResult extends ISize {
-  images?: ISize[]
-}
+  width: number | undefined;
+  height: number | undefined;
+  orientation?: number;
+  type?: string;
+};
 
-export interface IImage {
-  validate: (buffer: Buffer) => boolean
-  calculate: (buffer: Buffer, filepath?: string) => ISizeCalculationResult
-}
+export type ISize = ImageMeta; // Reduce refactor for types/*
+
+export type IImage = {
+  validate: (input: Uint8Array) => boolean;
+  calculate: (input: Uint8Array, filepath?: string) => ImageMeta;
+};

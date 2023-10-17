@@ -1,14 +1,11 @@
-import { IImage } from './interface'
+import type { IImage } from './interface'
+import { toUTF8String, readUInt32BE } from './utils'
 
 export const PSD: IImage = {
-  validate (buffer) {
-    return (buffer.toString('ascii', 0, 4) === '8BPS')
-  },
+  validate: (input) => toUTF8String(input, 0, 4) === '8BPS',
 
-  calculate (buffer) {
-    return {
-      height: buffer.readUInt32BE(14),
-      width: buffer.readUInt32BE(18)
-    }
-  }
+  calculate: (input) => ({
+    height: readUInt32BE(input, 14),
+    width: readUInt32BE(input, 18),
+  }),
 }

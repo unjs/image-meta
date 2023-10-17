@@ -1,17 +1,18 @@
-import { IImage } from './interface'
+import type { IImage } from './interface'
+import { toUTF8String, readUInt32BE } from './utils'
 
-const pngSignature = 'PNG\r\n\x1A\n'
+const pngSignature = 'PNG\r\n\u001A\n'
 const pngImageHeaderChunkName = 'IHDR'
 
 // Used to detect "fried" png's: http://www.jongware.com/pngdefry.html
 const pngFriedChunkName = 'CgBI'
 
 export const PNG: IImage = {
-  validate (buffer) {
-    if (pngSignature === buffer.toString('ascii', 1, 8)) {
-      let chunkName = buffer.toString('ascii', 12, 16)
+  validate(input) {
+    if (pngSignature === toUTF8String(input, 1, 8)) {
+      let chunkName = toUTF8String(input, 12, 16)
       if (chunkName === pngFriedChunkName) {
-        chunkName = buffer.toString('ascii', 28, 32)
+        chunkName = toUTF8String(input, 28, 32)
       }
       if (chunkName !== pngImageHeaderChunkName) {
         throw new TypeError('Invalid PNG')
@@ -21,16 +22,16 @@ export const PNG: IImage = {
     return false
   },
 
-  calculate (buffer) {
-    if (buffer.toString('ascii', 12, 16) === pngFriedChunkName) {
+  calculate(input) {
+    if (toUTF8String(input, 12, 16) === pngFriedChunkName) {
       return {
-        height: buffer.readUInt32BE(36),
-        width: buffer.readUInt32BE(32)
+        height: readUInt32BE(input, 36),
+        width: readUInt32BE(input, 32),
       }
     }
     return {
-      height: buffer.readUInt32BE(20),
-      width: buffer.readUInt32BE(16)
+      height: readUInt32BE(input, 20),
+      width: readUInt32BE(input, 16),
     }
-  }
+  },
 }

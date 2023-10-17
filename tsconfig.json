@@ -1,25 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
-    "module": "commonjs",
-    "allowJs": false,
-    "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "src",
-    "removeComments": false,
-    "strict": true,
-    "alwaysStrict": true,
-    "moduleResolution": "node"
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "typedocOptions": {
-    "excludeExternals": true,
-    "excludeNotExported": true,
-    "excludePrivate": true,
-    "excludeProtected": true,
-    "inputFiles": ["lib/index.ts"],
-    "out": "docs"
-  }
+  "include": ["src"]
 }

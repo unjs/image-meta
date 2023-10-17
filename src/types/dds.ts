@@ -1,14 +1,11 @@
-import { IImage } from './interface'
+import type { IImage } from './interface'
+import { readUInt32LE } from './utils'
 
 export const DDS: IImage = {
-  validate (buffer) {
-    return buffer.readUInt32LE(0) === 0x20534444
-  },
+  validate: (input) => readUInt32LE(input, 0) === 0x20_53_44_44,
 
-  calculate (buffer) {
-    return {
-      height: buffer.readUInt32LE(12),
-      width: buffer.readUInt32LE(16)
-    }
-  }
+  calculate: (input) => ({
+    height: readUInt32LE(input, 12),
+    width: readUInt32LE(input, 16),
+  }),
 }
