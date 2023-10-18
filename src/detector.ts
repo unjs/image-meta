@@ -1,10 +1,10 @@
-import type { imageType } from "./types/index";
-import { typeHandlers } from "./types/index";
+import type { ImageType } from "./types";
+import { typeHandlers } from "./types";
 
-const keys = Object.keys(typeHandlers) as imageType[];
+const keys = Object.keys(typeHandlers) as ImageType[];
 
 // This map helps avoid validating for every single image type
-const firstBytes: { [byte: number]: imageType } = {
+const firstBytes: { [byte: number]: ImageType } = {
   0x38: "psd",
   0x42: "bmp",
   0x44: "dds",
@@ -17,7 +17,7 @@ const firstBytes: { [byte: number]: imageType } = {
   0xff: "jpg",
 };
 
-export function detector(input: Uint8Array): imageType | undefined {
+export function detector(input: Uint8Array): ImageType | undefined {
   const byte = input[0];
   if (byte in firstBytes) {
     const type = firstBytes[byte];
@@ -26,5 +26,5 @@ export function detector(input: Uint8Array): imageType | undefined {
     }
   }
 
-  return keys.find((key: imageType) => typeHandlers[key].validate(input));
+  return keys.find((key: ImageType) => typeHandlers[key].validate(input));
 }
