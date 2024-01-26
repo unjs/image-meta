@@ -16,6 +16,7 @@ import { SVG } from "./svg";
 import { TGA } from "./tga";
 import { TIFF } from "./tiff";
 import { WEBP } from "./webp";
+import { AVIF } from "./avif";
 
 export const typeHandlers = {
   bmp: BMP,
@@ -35,6 +36,7 @@ export const typeHandlers = {
   tga: TGA,
   tiff: TIFF,
   webp: WEBP,
+  avif: AVIF,
 };
 
 export type ImageType = keyof typeof typeHandlers;
