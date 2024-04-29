@@ -2,7 +2,10 @@
   "name": "image-meta",
   "version": "0.2.0",
   "description": "Detect image type and size using pure javascript",
-  "repository": "unjs/image-meta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unjs/image-meta.git"
+  },
   "license": "MIT",
   "sideEffects": false,
   "type": "module",
