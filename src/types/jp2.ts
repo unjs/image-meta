@@ -50,7 +50,7 @@ export const JP2: IImage = {
     switch (nextBoxType) {
       case BoxTypes.rreq: {
         // WHAT ARE THESE 4 BYTES?????
-        // eslint-disable-next-line no-case-declarations
+
         const MAGIC = 4;
         offset =
           offset + 4 + MAGIC + calculateRREQLength(input.slice(offset + 4));
