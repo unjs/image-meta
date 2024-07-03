@@ -1,47 +1,62 @@
 # image-meta
 
-[![npm version][npm-v-src]][npm-v-href]
-[![npm downloads][npm-d-src]][npm-d-href]
-[![bundle phobia][bundlephobia-src]][bundlephobia-href]
+[![npm version][npm-version-src]][npm-version-href]
+[![npm downloads][npm-downloads-src]][npm-downloads-href]
+[![bundle][bundle-src]][bundle-href]
+[![Codecov][codecov-src]][codecov-href]
 
+Detect image type and size using pure javascript.
 
-Using yarn:
+## Usage
 
-```
-yarn add image-meta
-```
+Install package:
 
-Using npm:
-
-```
+```sh
+# npm
 npm install image-meta
-```
 
-Usage:
+# yarn
+yarn add image-meta
+
+# pnpm
+pnpm install image-meta
+
+# bun
+bun install image-meta
+```
 
 ```ts
-import { imageMeta } from 'image-meta'
-import fetch from 'node-fetch'
+import { imageMeta } from "image-meta";
 
-const data = await fetch(url).then(res => res.buffer())
-const { width, height, mimeType } = await imageMeta(data)
+const data = await fetch(url).then((res) => res.buffer());
+
+// Meta contains { type, width?, height?, orientation? }
+const meta = imageMeta(data);
 ```
 
-**Note:** This package only works with Node.js because of `Buffer` dependency!
+**Note:** `imageMeta` throws an error if either data is not a `Buffer`/`Uint8Array`, or data is invalid or type cannot be determined. You should wrap it into a `try/catch` statement to handle errors.
+
+## Development
+
+- Clone this repository
+- Install latest LTS version of [Node.js](https://nodejs.org/en/)
+- Enable [Corepack](https://github.com/nodejs/corepack) using `corepack enable`
+- Install dependencies using `pnpm install`
+- Run interactive tests using `pnpm dev`
 
 ## License
 
-[MIT](./LICENSE) - Based on [image-size](https://github.com/image-size/image-size)
+Made with 💛
 
-<!-- Refs -->
-[npm-v-src]: https://img.shields.io/npm/v/image-meta?style=flat-square
-[npm-v-href]: https://npmjs.com/package/image-meta
+Published under [MIT License](./LICENSE).
 
-[npm-d-src]: https://img.shields.io/npm/dm/image-meta?style=flat-square
-[npm-d-href]: https://npmjs.com/package/image-meta
+<!-- Badges -->
 
-[github-actions-src]: https://img.shields.io/github/workflow/status/nuxt-contrib/image-meta/ci/master?style=flat-square
-[github-actions-href]: https://github.com/nuxt-contrib/image-meta/actions?query=workflow%3Aci
-
-[bundlephobia-src]: https://img.shields.io/bundlephobia/min/image-meta?style=flat-square
-[bundlephobia-href]: https://bundlephobia.com/result?p=image-meta
+[npm-version-src]: https://img.shields.io/npm/v/image-meta?style=flat&colorA=18181B&colorB=F0DB4F
+[npm-version-href]: https://npmjs.com/package/image-meta
+[npm-downloads-src]: https://img.shields.io/npm/dm/image-meta?style=flat&colorA=18181B&colorB=F0DB4F
+[npm-downloads-href]: https://npmjs.com/package/image-meta
+[codecov-src]: https://img.shields.io/codecov/c/gh/unjs/image-meta/main?style=flat&colorA=18181B&colorB=F0DB4F
+[codecov-href]: https://codecov.io/gh/unjs/image-meta
+[bundle-src]: https://img.shields.io/bundlephobia/minzip/image-meta?style=flat&colorA=18181B&colorB=F0DB4F
+[bundle-href]: https://bundlephobia.com/result?p=image-meta
