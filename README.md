@@ -39,7 +39,7 @@ const meta = imageMeta(data);
 ## Development
 
 - Clone this repository
-- Install latest LTS version of [Node.js](https://nodejs.org/en/)
+- Install the latest LTS version of [Node.js](https://nodejs.org/en/)
 - Enable [Corepack](https://github.com/nodejs/corepack) using `corepack enable`
 - Install dependencies using `pnpm install`
 - Run interactive tests using `pnpm dev`
@@ -47,6 +47,8 @@ const meta = imageMeta(data);
 ## License
 
 Made with 💛
+
+🔀 Based on [image-size](https://github.com/image-size/image-size) by [Aditya Yadav](https://github.com/netroy) and [contributors](https://github.com/image-size/image-size/graphs/contributors).
 
 Published under [MIT License](./LICENSE).
 
