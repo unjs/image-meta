@@ -3,6 +3,7 @@ import { BMP } from "./bmp";
 import { CUR } from "./cur";
 import { DDS } from "./dds";
 import { GIF } from "./gif";
+import { HEIC } from "./heic";
 import { ICNS } from "./icns";
 import { ICO } from "./ico";
 import { J2C } from "./j2c";
@@ -23,6 +24,7 @@ export const typeHandlers = {
   cur: CUR,
   dds: DDS,
   gif: GIF,
+  heic: HEIC,
   icns: ICNS,
   ico: ICO,
   j2c: J2C,
