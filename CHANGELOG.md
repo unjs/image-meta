@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.2
+
+- Add `heic` support.
+- Update Deps.
+
 
 ## v0.2.1
 
@@ -23,4 +28,3 @@
 - Sebastian Bosse ([@SebastianBosse](http://github.com/SebastianBosse))
 - Pooya Parsa ([@pi0](http://github.com/pi0))
 - Tasiotas <tasiotas@gmail.com>
-
