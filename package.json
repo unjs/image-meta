@@ -1,6 +1,6 @@
 {
-  "name": "image-meta",
-  "version": "0.2.1",
+  "name": "@anudit/image-meta",
+  "version": "0.2.2",
   "description": "Detect image type and size using pure javascript",
   "repository": "unjs/image-meta",
   "license": "MIT",
