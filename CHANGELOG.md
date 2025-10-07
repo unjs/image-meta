@@ -1,10 +1,5 @@
 # Changelog
 
-## v0.2.2
-
-- Add `heic` support.
-- Update Deps.
-
 
 ## v0.2.1
 
