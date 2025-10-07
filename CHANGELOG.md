@@ -1,6 +1,24 @@
 # Changelog
 
 
+## v0.2.2
+
+[compare changes](https://github.com/unjs/image-meta/compare/v0.2.1...v0.2.2)
+
+### 🚀 Enhancements
+
+- Add heic support ([#55](https://github.com/unjs/image-meta/pull/55))
+
+### 🏡 Chore
+
+- Add credits ([9cf9dbf](https://github.com/unjs/image-meta/commit/9cf9dbf))
+- Update deps ([498c032](https://github.com/unjs/image-meta/commit/498c032))
+
+### ❤️ Contributors
+
+- Pooya Parsa ([@pi0](https://github.com/pi0))
+- Anudit Nagar ([@aapkasaarthi](https://github.com/aapkasaarthi))
+
 ## v0.2.1
 
 [compare changes](https://github.com/unjs/image-meta/compare/v0.2.0...v0.2.1)
