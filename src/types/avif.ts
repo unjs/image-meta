@@ -38,7 +38,7 @@ function findBox(
   startOffset = 0,
   endOffset = input.length,
 ) {
-  for (let offset = startOffset; offset < endOffset; ) {
+  for (let offset = startOffset; offset < endOffset;) {
     const size = readUInt32BE(input, offset);
     const boxType = toUTF8String(input, offset + 4, offset + 8);
 
