@@ -8,10 +8,44 @@ type IAttributes = {
 };
 
 const svgReg = /<svg\s([^"'>]|"[^"]*"|'[^']*')*>/;
+const svgRegGlobal = new RegExp(svgReg.source, "g");
+
+const COMMENT_OPEN = "<!--";
+const COMMENT_CLOSE = "-->";
+
+/**
+ * Match the root `<svg>` tag, skipping any tag that sits inside an XML comment.
+ *
+ * Editors and export tools routinely leave a commented-out `<svg …>` above the
+ * real one. Comments cannot nest, so a tag is commented out when the nearest
+ * preceding `<!--` has no `-->` between it and the tag.
+ */
+function matchRootTag(svg: string): string | undefined {
+  svgRegGlobal.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = svgRegGlobal.exec(svg)) !== null) {
+    const commentStart = svg.lastIndexOf(COMMENT_OPEN, match.index);
+    if (commentStart === -1) {
+      return match[0];
+    }
+    const commentEnd = svg.indexOf(
+      COMMENT_CLOSE,
+      commentStart + COMMENT_OPEN.length,
+    );
+    if (commentEnd === -1) {
+      // Unterminated comment: everything from here on is commented out.
+      return undefined;
+    }
+    if (commentEnd > match.index) {
+      svgRegGlobal.lastIndex = commentEnd + COMMENT_CLOSE.length;
+      continue;
+    }
+    return match[0];
+  }
+}
 
 const extractorRegExps = {
   height: /\sheight=(["'])([^%]+?)\1/,
-  root: svgReg,
   viewbox: /\sviewbox=(["'])(.+?)\1/i,
   width: /\swidth=(["'])([^%]+?)\1/,
 };
@@ -92,9 +126,9 @@ export const SVG: IImage = {
   validate: (input) => svgReg.test(toUTF8String(input, 0, 1000)),
 
   calculate(input) {
-    const root = toUTF8String(input).match(extractorRegExps.root);
+    const root = matchRootTag(toUTF8String(input));
     if (root) {
-      const attrs = parseAttributes(root[0]);
+      const attrs = parseAttributes(root);
       if (attrs.width && attrs.height) {
         return calculateByDimensions(attrs);
       }
