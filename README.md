@@ -35,8 +35,8 @@ The type is detected from the file contents, not the file extension.
 ```ts
 type ImageMeta = {
   type?: string; // detected format, e.g. "png"
-  width: number | undefined; // of the largest image when there are several
-  height: number | undefined;
+  width: number; // of the largest image when there are several
+  height: number;
   orientation?: number; // EXIF orientation (jpg)
   images?: Omit<ImageMeta, "images">[]; // all embedded images (ico, cur, icns)
 };

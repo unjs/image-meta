@@ -23,10 +23,7 @@ export function imageMeta(input: Uint8Array): ImageMeta {
       // Report the largest image when the file holds several (e.g. icons)
       if (size.images && size.images.length > 1) {
         for (const image of size.images) {
-          if (
-            (image.width ?? 0) * (image.height ?? 0) >
-            (size.width ?? 0) * (size.height ?? 0)
-          ) {
+          if (image.width * image.height > size.width * size.height) {
             size.width = image.width;
             size.height = image.height;
           }
@@ -38,7 +35,7 @@ export function imageMeta(input: Uint8Array): ImageMeta {
         throw new TypeError(`Invalid ${type}, truncated or corrupt input`);
       }
       // A zero height is allowed for one-dimensional textures (ktx)
-      if (size.width! <= 0 || size.height! < 0) {
+      if (size.width <= 0 || size.height < 0) {
         throw new TypeError(`Invalid ${type}, zero or negative size`);
       }
       size.type = type;

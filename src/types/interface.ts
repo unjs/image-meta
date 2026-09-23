@@ -1,8 +1,8 @@
 export type ImageMeta = {
   images?: Omit<ImageMeta, "images">[];
 
-  width: number | undefined;
-  height: number | undefined;
+  width: number;
+  height: number;
   orientation?: number;
   type?: string;
 };
