@@ -1,0 +1,47 @@
+{
+  "height": 16,
+  "images": [
+    {
+      "height": 16,
+      "type": "is32",
+      "width": 16,
+    },
+    {
+      "height": 16,
+      "type": "s8mk",
+      "width": 16,
+    },
+    {
+      "height": 32,
+      "type": "il32",
+      "width": 32,
+    },
+    {
+      "height": 32,
+      "type": "l8mk",
+      "width": 32,
+    },
+    {
+      "height": 48,
+      "type": "ih32",
+      "width": 48,
+    },
+    {
+      "height": 48,
+      "type": "h8mk",
+      "width": 48,
+    },
+    {
+      "height": 128,
+      "type": "it32",
+      "width": 128,
+    },
+    {
+      "height": 128,
+      "type": "t8mk",
+      "width": 128,
+    },
+  ],
+  "type": "icns",
+  "width": 16,
+}

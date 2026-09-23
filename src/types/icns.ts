@@ -94,27 +94,28 @@ export const ICNS: IImage = {
     const fileLength = readUInt32BE(input, FILE_LENGTH_OFFSET);
     let imageOffset = SIZE_HEADER;
 
-    let imageHeader = readImageHeader(input, imageOffset);
-    let imageSize = getImageSize(imageHeader[0]);
-    imageOffset += imageHeader[1];
-
-    if (imageOffset === fileLength) {
-      return imageSize;
-    }
-
-    const result = {
-      height: imageSize.height,
-      images: [imageSize],
-      width: imageSize.width,
-    };
-
+    const images: ISize[] = [];
     while (imageOffset < fileLength && imageOffset < inputLength) {
-      imageHeader = readImageHeader(input, imageOffset);
-      imageSize = getImageSize(imageHeader[0]);
-      imageOffset += imageHeader[1];
-      result.images.push(imageSize);
+      const [type, entryLength] = readImageHeader(input, imageOffset);
+      imageOffset += entryLength;
+      // Skip entries that are not icons (e.g. "TOC ", "icnV", "info")
+      if (type in ICON_TYPE_SIZE) {
+        images.push(getImageSize(type));
+      }
     }
 
-    return result;
+    if (images.length === 0) {
+      throw new TypeError("Invalid ICNS, no icons found");
+    }
+
+    if (images.length === 1) {
+      return images[0];
+    }
+
+    return {
+      height: images[0].height,
+      images,
+      width: images[0].width,
+    };
   },
 };
