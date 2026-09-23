@@ -10,9 +10,10 @@ export const toHexString = (input: Uint8Array, start = 0, end = input.length) =>
     .slice(start, end)
     .reduce((memo, i) => memo + ("0" + i.toString(16)).slice(-2), "");
 
+// Signed readers use arithmetic (not bitwise ops), so reading past the end yields NaN instead of 0
 export const readInt16LE = (input: Uint8Array, offset = 0) => {
   const val = input[offset] + input[offset + 1] * 2 ** 8;
-  return val | ((val & (2 ** 15)) * 0x1_ff_fe);
+  return val >= 2 ** 15 ? val - 2 ** 16 : val;
 };
 
 export const readUInt16BE = (input: Uint8Array, offset = 0) =>
@@ -24,11 +25,10 @@ export const readUInt16LE = (input: Uint8Array, offset = 0) =>
 export const readUInt24LE = (input: Uint8Array, offset = 0) =>
   input[offset] + input[offset + 1] * 2 ** 8 + input[offset + 2] * 2 ** 16;
 
-export const readInt32LE = (input: Uint8Array, offset = 0) =>
-  input[offset] +
-  input[offset + 1] * 2 ** 8 +
-  input[offset + 2] * 2 ** 16 +
-  (input[offset + 3] << 24);
+export const readInt32LE = (input: Uint8Array, offset = 0) => {
+  const val = readUInt32LE(input, offset);
+  return val >= 2 ** 31 ? val - 2 ** 32 : val;
+};
 
 export const readUInt32BE = (input: Uint8Array, offset = 0) =>
   input[offset] * 2 ** 24 +
