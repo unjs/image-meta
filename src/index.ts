@@ -1,8 +1,8 @@
-import { typeHandlers } from "./types";
-import { detector } from "./detector";
-import type { ImageMeta } from "./types/interface";
+import { typeHandlers } from "./types/index.ts";
+import { detector } from "./detector.ts";
+import type { ImageMeta } from "./types/interface.ts";
 
-export type { ImageMeta } from "./types/interface";
+export type { ImageMeta } from "./types/interface.ts";
 
 /**
  * @param {Uint8Array|string} input - Uint8Array or relative/absolute path of the image file

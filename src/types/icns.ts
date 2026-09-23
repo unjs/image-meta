@@ -1,5 +1,5 @@
-import type { IImage, ISize } from "./interface";
-import { toUTF8String, readUInt32BE } from "./utils";
+import type { IImage, ISize } from "./interface.ts";
+import { toUTF8String, readUInt32BE } from "./utils.ts";
 
 /**
  * ICNS Header

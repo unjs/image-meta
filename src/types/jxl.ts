@@ -1,6 +1,6 @@
 // based on the JPEG XL spec (ISO/IEC 18181) SizeHeader
-import type { IImage, ISize } from "./interface";
-import { findBox, readUInt32BE, toHexString, toUTF8String } from "./utils";
+import type { IImage, ISize } from "./interface.ts";
+import { findBox, readUInt32BE, toHexString, toUTF8String } from "./utils.ts";
 
 // Read `length` bits (least significant first), after the 2-byte codestream signature
 function createBitReader(input: Uint8Array) {

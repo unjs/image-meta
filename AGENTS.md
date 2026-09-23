@@ -2,6 +2,8 @@
 
 `image-meta`: detect image type and dimensions from a `Uint8Array`, in pure JS. It has no runtime dependencies and uses no Node APIs in `src/`.
 
+`src/` runs directly under Node's built-in type stripping (`node src/index.ts`): relative imports use explicit `.ts` extensions, and only erasable TS syntax is allowed (no `enum`, `namespace`, or parameter properties). `tsconfig.json` enforces both.
+
 ## Layout
 
 - `src/index.ts`: `imageMeta(input)` is the public API. It detects the type, calls the handler's `calculate`, and throws `TypeError` for unsupported input.

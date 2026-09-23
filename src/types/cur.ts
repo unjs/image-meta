@@ -1,6 +1,6 @@
-import type { IImage } from "./interface";
-import { ICO } from "./ico";
-import { readUInt16LE } from "./utils";
+import type { IImage } from "./interface.ts";
+import { ICO } from "./ico.ts";
+import { readUInt16LE } from "./utils.ts";
 
 const TYPE_CURSOR = 2;
 export const CUR: IImage = {

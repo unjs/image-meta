@@ -1,5 +1,5 @@
-import type { IImage } from "./interface";
-import { readUInt32BE } from "./utils";
+import type { IImage } from "./interface.ts";
+import { readUInt32BE } from "./utils.ts";
 
 export const J2C: IImage = {
   // Start of codestream (SOC) marker, immediately followed by the image and tile size (SIZ) marker

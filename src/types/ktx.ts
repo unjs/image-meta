@@ -1,5 +1,5 @@
-import type { IImage } from "./interface";
-import { toUTF8String, readUInt32LE } from "./utils";
+import type { IImage } from "./interface.ts";
+import { toUTF8String, readUInt32LE } from "./utils.ts";
 
 export const KTX: IImage = {
   validate: (input) => {

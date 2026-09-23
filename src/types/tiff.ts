@@ -1,7 +1,7 @@
 // based on http://www.compix.com/fileformattif.htm
 // and https://www.awaresystems.be/imaging/tiff/bigtiff.html
-import { readUInt, toHexString, toUTF8String } from "./utils";
-import type { IImage } from "./interface";
+import { readUInt, toHexString, toUTF8String } from "./utils.ts";
+import type { IImage } from "./interface.ts";
 
 const TAG_WIDTH = 256;
 const TAG_HEIGHT = 257;
