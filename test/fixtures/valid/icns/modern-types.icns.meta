@@ -1,0 +1,42 @@
+{
+  "height": 64,
+  "images": [
+    {
+      "height": 16,
+      "type": "ic04",
+      "width": 16,
+    },
+    {
+      "height": 18,
+      "type": "icsb",
+      "width": 18,
+    },
+    {
+      "height": 24,
+      "type": "sb24",
+      "width": 24,
+    },
+    {
+      "height": 32,
+      "type": "ic05",
+      "width": 32,
+    },
+    {
+      "height": 36,
+      "type": "icsB",
+      "width": 36,
+    },
+    {
+      "height": 48,
+      "type": "SB24",
+      "width": 48,
+    },
+    {
+      "height": 64,
+      "type": "ic12",
+      "width": 64,
+    },
+  ],
+  "type": "icns",
+  "width": 64,
+}
