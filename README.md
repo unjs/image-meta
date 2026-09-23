@@ -49,7 +49,7 @@ type ImageMeta = {
 ```ts
 try {
   const meta = imageMeta(data);
-} catch (error) {
+} catch {
   // Not a supported image
 }
 ```
