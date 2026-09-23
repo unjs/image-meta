@@ -105,10 +105,18 @@ function validateInput(input: Uint8Array, index: number): void {
   if (index > input.length) {
     throw new TypeError("Corrupt JPG, exceeded buffer limits");
   }
-  // Every JPEG block must begin with a 0xFF
-  if (input[index] !== 0xff) {
+}
+
+// Find the 0xFF that starts the next marker, skipping extraneous bytes and 0xFF fill bytes
+function findMarker(input: Uint8Array, index: number): number {
+  let marker = input.indexOf(0xff, index);
+  if (marker === -1) {
     throw new TypeError("Invalid JPG, marker table corrupted");
   }
+  while (input[marker + 1] === 0xff) {
+    marker++;
+  }
+  return marker;
 }
 
 export const JPG: IImage = {
@@ -116,7 +124,7 @@ export const JPG: IImage = {
 
   calculate(input) {
     // Skip 4 chars, they are for signature
-    input = input.slice(4);
+    input = input.subarray(4);
 
     let orientation: number | undefined;
     let next: number;
@@ -124,19 +132,22 @@ export const JPG: IImage = {
       // read length of the next block
       const i = readUInt16BE(input, 0);
 
+      // ensure correct format
+      validateInput(input, i);
+
       if (isEXIF(input)) {
         orientation = validateExifBlock(input, i);
       }
 
-      // ensure correct format
-      validateInput(input, i);
+      // Every JPEG block must begin with a 0xFF
+      const marker = findMarker(input, i);
 
       // 0xFFC0 is baseline standard(SOF)
       // 0xFFC1 is baseline optimized(SOF)
       // 0xFFC2 is progressive(SOF2)
-      next = input[i + 1];
+      next = input[marker + 1];
       if (next === 0xc0 || next === 0xc1 || next === 0xc2) {
-        const size = extractSize(input, i + 5);
+        const size = extractSize(input, marker + 5);
 
         // TODO: is orientation=0 a valid answer here?
         if (!orientation) {
@@ -151,7 +162,7 @@ export const JPG: IImage = {
       }
 
       // move to the next block
-      input = input.slice(i + 2);
+      input = input.subarray(marker + 2);
     }
 
     throw new TypeError("Invalid JPG, no size found");
