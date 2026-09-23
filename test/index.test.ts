@@ -23,7 +23,7 @@ describe("image-meta", () => {
                 const data = await readFile(filePath);
                 const meta = imageMeta(data);
                 expect(meta.type).toBe(format);
-                expect(meta).toMatchFileSnapshot(filePath + ".meta");
+                await expect(meta).toMatchFileSnapshot(filePath + ".meta");
               });
             } else {
               test(fileName, async () => {
