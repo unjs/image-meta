@@ -13,7 +13,7 @@ const commentReg = /<!--[\s\S]*?(?:-->|$)/g;
 const extractorRegExps = {
   height: /\sheight=(["'])([^%]+?)\1/,
   root: svgReg,
-  viewbox: /\sviewbox=(["'])(.+?)\1/i,
+  viewbox: /\sviewbox=(["'])([\s\S]+?)\1/i,
   width: /\swidth=(["'])([^%]+?)\1/,
 };
 
@@ -43,7 +43,8 @@ function parseLength(len: string) {
 }
 
 function parseViewbox(viewbox: string): IAttributes {
-  const bounds = viewbox.split(" ");
+  // min-x, min-y, width and height, separated by whitespace and/or a comma
+  const bounds = viewbox.trim().split(/[\s,]+/);
   return {
     height: parseLength(bounds[3]) as number,
     width: parseLength(bounds[2]) as number,
@@ -101,7 +102,7 @@ export const SVG: IImage = {
       if (attrs.width && attrs.height) {
         return calculateByDimensions(attrs);
       }
-      if (attrs.viewbox) {
+      if (attrs.viewbox?.width && attrs.viewbox.height) {
         return calculateByViewbox(attrs, attrs.viewbox);
       }
     }
