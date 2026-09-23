@@ -8,6 +8,7 @@ type IAttributes = {
 };
 
 const svgReg = /<svg\s([^"'>]|"[^"]*"|'[^']*')*>/;
+const commentReg = /<!--[\s\S]*?(?:-->|$)/g;
 
 const extractorRegExps = {
   height: /\sheight=(["'])([^%]+?)\1/,
@@ -92,7 +93,9 @@ export const SVG: IImage = {
   validate: (input) => svgReg.test(toUTF8String(input, 0, 1000)),
 
   calculate(input) {
-    const root = toUTF8String(input).match(extractorRegExps.root);
+    const root = toUTF8String(input)
+      .replace(commentReg, "")
+      .match(extractorRegExps.root);
     if (root) {
       const attrs = parseAttributes(root[0]);
       if (attrs.width && attrs.height) {
