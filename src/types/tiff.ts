@@ -17,11 +17,13 @@ function readIFD(buffer: Uint8Array, isBigEndian: boolean) {
   return buffer.slice(ifdOffset + 2, ifdOffset + 2 + bufferSize);
 }
 
-// TIFF values seem to be messed up on Big-Endian, this helps
-function readValue(buffer: Uint8Array, isBigEndian: boolean): number {
-  const low = readUInt(buffer, 16, 8, isBigEndian);
-  const high = readUInt(buffer, 16, 10, isBigEndian);
-  return (high << 16) + low;
+// Read the value of a SHORT (3) or LONG (4) tag stored inline in the entry
+function readValue(
+  buffer: Uint8Array,
+  type: number,
+  isBigEndian: boolean,
+): number {
+  return readUInt(buffer, type === 3 ? 16 : 32, 8, isBigEndian);
 }
 
 // move to the next tag
@@ -48,7 +50,7 @@ function extractTags(buffer: Uint8Array, isBigEndian: boolean) {
       // 256 is width, 257 is height
       // if (code === 256 || code === 257) {
       if (length === 1 && (type === 3 || type === 4)) {
-        tags[code] = readValue(temp, isBigEndian);
+        tags[code] = readValue(temp, type, isBigEndian);
       }
 
       // move to the next tag
