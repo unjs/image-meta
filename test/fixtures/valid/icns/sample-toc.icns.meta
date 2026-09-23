@@ -1,5 +1,5 @@
 {
-  "height": 16,
+  "height": 128,
   "images": [
     {
       "height": 16,
@@ -43,5 +43,5 @@
     },
   ],
   "type": "icns",
-  "width": 16,
+  "width": 128,
 }
