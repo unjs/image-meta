@@ -24,4 +24,4 @@
 - `pnpm vitest run`: run tests only
 - `pnpm test`: lint + typecheck + tests with coverage
 - `pnpm lint:fix`: eslint (`eslint-config-unjs`) + prettier
-- `pnpm build`: unbuild to `dist/` (ESM + CJS)
+- `pnpm build`: obuild to `dist/` (ESM only)
