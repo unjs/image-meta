@@ -59,6 +59,9 @@ export const ICO: IImage = {
 
   calculate(input) {
     const nbImages = readUInt16LE(input, 4);
+    if (SIZE_HEADER + nbImages * SIZE_IMAGE_ENTRY > input.length) {
+      throw new TypeError("Invalid ICO");
+    }
     const imageSize = getImageSize(input, 0);
 
     if (nbImages === 1) {
