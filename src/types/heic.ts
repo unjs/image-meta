@@ -1,5 +1,61 @@
 import type { IImage } from "./interface";
-import { toUTF8String, readUInt32BE } from "./utils";
+import { findBox, readUInt32BE, toUTF8String } from "./utils";
+
+type Size = { width: number; height: number };
+
+// Read the size of each image from the item properties (meta > iprp > ipco)
+function readImageSizes(input: Uint8Array): Size[] {
+  const metaBox = findBox(input, "meta");
+  const iprpBox =
+    metaBox &&
+    findBox(input, "iprp", metaBox.offset + 12, metaBox.offset + metaBox.size);
+  const ipcoBox =
+    iprpBox &&
+    findBox(input, "ipco", iprpBox.offset + 8, iprpBox.offset + iprpBox.size);
+  if (!ipcoBox) {
+    throw new TypeError("Invalid HEIF, no ipco box found");
+  }
+
+  const images: Size[] = [];
+  const end = ipcoBox.offset + ipcoBox.size;
+  let offset = ipcoBox.offset + 8;
+  while (offset + 8 <= end) {
+    const size = readUInt32BE(input, offset);
+    if (size < 8 || offset + size > end) {
+      throw new TypeError("Invalid HEIF, corrupt ipco box");
+    }
+    const name = toUTF8String(input, offset + 4, offset + 8);
+
+    // Image spatial extents: full box header, then width and height
+    if (name === "ispe") {
+      if (size < 20) {
+        throw new TypeError("Invalid HEIF, corrupt ispe box");
+      }
+      images.push({
+        width: readUInt32BE(input, offset + 12),
+        height: readUInt32BE(input, offset + 16),
+      });
+    }
+
+    // Clean aperture crops the preceding image: width and height as fractions
+    if (name === "clap" && size >= 24 && images.length > 0) {
+      const image = images.at(-1)!;
+      const widthD = readUInt32BE(input, offset + 12);
+      const heightD = readUInt32BE(input, offset + 20);
+      if (widthD > 0 && heightD > 0) {
+        image.width = Math.round(readUInt32BE(input, offset + 8) / widthD);
+        image.height = Math.round(readUInt32BE(input, offset + 16) / heightD);
+      }
+    }
+
+    offset += size;
+  }
+
+  if (images.length === 0) {
+    throw new TypeError("Invalid HEIF, no ispe box found");
+  }
+  return images;
+}
 
 export const HEIC: IImage = {
   validate: (input) => {
@@ -17,103 +73,14 @@ export const HEIC: IImage = {
   },
 
   calculate: (input) => {
-    const metaBox = findBox(input, "meta");
-    if (!metaBox) throw new TypeError("heic: meta box not found");
-
-    const iprpBox = findBox(
-      input,
-      "iprp",
-      metaBox.offset + 12,
-      metaBox.offset + metaBox.size,
-    );
-    if (!iprpBox) throw new TypeError("heic: iprp box not found");
-
-    const ipcoBox = findBox(
-      input,
-      "ipco",
-      iprpBox.offset + 8,
-      iprpBox.offset + iprpBox.size,
-    );
-    if (!ipcoBox) throw new TypeError("heic: ipco box not found");
-
-    // Collect all 'ispe' boxes and find the largest dimensions
-    const dimensions = findAllBoxes(
-      input,
-      "ispe",
-      ipcoBox.offset + 8,
-      ipcoBox.offset + ipcoBox.size,
-    ).map((box) => ({
-      width: readUInt32BE(input, box.offset + 12),
-      height: readUInt32BE(input, box.offset + 16),
-    }));
-
-    if (dimensions.length === 0)
-      throw new TypeError("heic: ispe box not found");
-
     // Pick dimensions with largest area (width * height)
-    let largestDimension = dimensions[0];
-
-    for (let i = 1; i < dimensions.length; i++) {
-      const curr = dimensions[i];
-      if (
-        curr.width * curr.height >
-        largestDimension.width * largestDimension.height
-      ) {
-        largestDimension = curr;
+    const [first, ...rest] = readImageSizes(input);
+    let largest = first;
+    for (const image of rest) {
+      if (image.width * image.height > largest.width * largest.height) {
+        largest = image;
       }
     }
-
-    return largestDimension;
+    return largest;
   },
 };
-
-function findBox(
-  input: Uint8Array,
-  type: string,
-  startOffset = 0,
-  endOffset = input.length,
-) {
-  let offset = startOffset;
-  while (offset < endOffset) {
-    const size = readUInt32BE(input, offset);
-    const boxType = toUTF8String(input, offset + 4, offset + 8);
-
-    if (boxType === type) {
-      return { offset, size };
-    }
-
-    if (size <= 0 || offset + size > endOffset) {
-      break;
-    }
-
-    offset += size;
-  }
-  return undefined;
-}
-
-function findAllBoxes(
-  input: Uint8Array,
-  type: string,
-  startOffset = 0,
-  endOffset = input.length,
-) {
-  let offset = startOffset;
-  const boxes = [];
-
-  while (offset < endOffset) {
-    const size = readUInt32BE(input, offset);
-    const boxType = toUTF8String(input, offset + 4, offset + 8);
-
-    if (boxType === type) {
-      boxes.push({ offset, size });
-    }
-
-    if (size <= 0 || offset + size > endOffset) {
-      break;
-    }
-
-    offset += size;
-  }
-
-  return boxes;
-}

@@ -62,3 +62,27 @@ export function readUInt(
   const methodName: MethodName = ("readUInt" + bits + endian) as MethodName;
   return methods[methodName](input, offset);
 }
+
+const BOX_HEADER_SIZE = 8;
+
+// Find an ISO-BMFF box by name, scanning siblings from startOffset up to endOffset
+export function findBox(
+  input: Uint8Array,
+  boxName: string,
+  startOffset = 0,
+  endOffset = input.length,
+) {
+  let offset = startOffset;
+  while (offset + BOX_HEADER_SIZE <= endOffset) {
+    const size = readUInt32BE(input, offset);
+    // Extended (1) and to-end-of-file (0) sizes are not supported, and smaller sizes are invalid
+    if (size < BOX_HEADER_SIZE || offset + size > endOffset) {
+      return undefined;
+    }
+    if (toUTF8String(input, offset + 4, offset + 8) === boxName) {
+      return { offset, size };
+    }
+    offset += size;
+  }
+  return undefined;
+}
