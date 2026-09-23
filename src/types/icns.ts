@@ -70,10 +70,15 @@ function readImageHeader(
   imageOffset: number,
 ): [string, number] {
   const imageLengthOffset = imageOffset + ENTRY_LENGTH_OFFSET;
-  return [
-    toUTF8String(input, imageOffset, imageLengthOffset),
-    readUInt32BE(input, imageLengthOffset),
-  ];
+  if (imageLengthOffset + 4 > input.length) {
+    throw new TypeError("Invalid ICNS");
+  }
+  const entryLength = readUInt32BE(input, imageLengthOffset);
+  // An entry holds at least its own 8-byte header; anything smaller would never advance
+  if (entryLength < 8) {
+    throw new TypeError("Invalid ICNS");
+  }
+  return [toUTF8String(input, imageOffset, imageLengthOffset), entryLength];
 }
 
 function getImageSize(type: string): ISize {
