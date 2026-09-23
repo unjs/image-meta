@@ -1,6 +1,6 @@
 // based on the JPEG XL spec (ISO/IEC 18181) SizeHeader
 import type { IImage, ISize } from "./interface";
-import { findBox, toHexString, toUTF8String } from "./utils";
+import { findBox, readUInt32BE, toHexString, toUTF8String } from "./utils";
 
 // Read `length` bits (least significant first), after the 2-byte codestream signature
 function createBitReader(input: Uint8Array) {
@@ -46,32 +46,57 @@ function calculateCodestream(input: Uint8Array): ISize {
   return { height, width: Math.floor((height * numerator) / denominator) };
 }
 
-// Extract (the start of) the codestream from a JXL container
-function extractCodestream(input: Uint8Array): Uint8Array {
-  const jxlcBox = findBox(input, "jxlc");
-  if (jxlcBox) {
-    return input.subarray(jxlcBox.offset + 8, jxlcBox.offset + jxlcBox.size);
-  }
+// The size header is at most 11 bytes into the codestream
+const CODESTREAM_PREFIX_BYTES = 32;
 
-  // Partial codestream boxes start with a 4-byte index; the size header only needs the first few bytes
+// Extract the start of the codestream from a JXL container (jxlc box, or jxlp partial boxes)
+function extractCodestream(input: Uint8Array): Uint8Array {
   const parts: Uint8Array[] = [];
   let length = 0;
   let offset = 0;
-  while (length < 32) {
-    const jxlpBox = findBox(input, "jxlp", offset);
-    if (!jxlpBox) {
-      break;
+  while (offset + 8 <= input.length && length < CODESTREAM_PREFIX_BYTES) {
+    let size = readUInt32BE(input, offset);
+    const name = toUTF8String(input, offset + 4, offset + 8);
+    let headerSize = 8;
+    if (size === 1) {
+      // 64-bit box size follows the name
+      if (offset + 16 > input.length) {
+        break;
+      }
+      size =
+        readUInt32BE(input, offset + 8) * 2 ** 32 +
+        readUInt32BE(input, offset + 12);
+      headerSize = 16;
+    } else if (size === 0) {
+      // The last box may extend to the end of the file
+      size = input.length - offset;
     }
-    if (jxlpBox.size < 12) {
-      throw new TypeError("Invalid JXL, corrupt jxlp box");
+
+    if (name === "jxlc" || name === "jxlp") {
+      // Partial codestream boxes start with a 4-byte index
+      const start = offset + headerSize + (name === "jxlp" ? 4 : 0);
+      if (size < start - offset) {
+        throw new TypeError(`Invalid JXL, corrupt ${name} box`);
+      }
+      // Clamp to the input, so a truncated file still yields its size header
+      const end = Math.min(
+        offset + size,
+        input.length,
+        start + CODESTREAM_PREFIX_BYTES - length,
+      );
+      if (end > start) {
+        parts.push(input.subarray(start, end));
+        length += end - start;
+      }
+      if (name === "jxlc") {
+        break;
+      }
     }
-    const part = input.subarray(
-      jxlpBox.offset + 12,
-      jxlpBox.offset + jxlpBox.size,
-    );
-    parts.push(part);
-    length += part.length;
-    offset = jxlpBox.offset + jxlpBox.size;
+
+    if (size < headerSize) {
+      throw new TypeError("Invalid JXL, corrupt box");
+    }
+    offset += size;
   }
 
   const codestream = new Uint8Array(length);
