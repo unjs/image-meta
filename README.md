@@ -56,7 +56,7 @@ try {
 
 ## Supported formats
 
-`avif`, `bmp`, `cur`, `dds`, `gif`, `heic`, `icns`, `ico`, `j2c`, `jp2`, `jpg`, `ktx`, `png`, `pnm`, `psd`, `svg`, `tga`, `tiff`, `webp`
+`avif`, `bmp`, `cur`, `dds`, `gif`, `heic`, `icns`, `ico`, `j2c`, `jp2`, `jpg`, `jxl`, `ktx`, `png`, `pnm`, `psd`, `svg`, `tga`, `tiff`, `webp`
 
 ## Development
 
