@@ -10,13 +10,13 @@ const TYPE_SHORT = 3;
 const TYPE_LONG = 4;
 const TYPE_LONG8 = 16;
 
-// Read a 64-bit unsigned integer, as long as it fits in a safe integer
+// libtiff rejects directories with more entries than this
+const MAX_ENTRIES = 4096;
+
+// Read a 64-bit unsigned integer (imprecise above Number.MAX_SAFE_INTEGER)
 function readUInt64(input: Uint8Array, offset: number, isBigEndian: boolean) {
   const high = readUInt(input, 32, offset + (isBigEndian ? 0 : 4), isBigEndian);
   const low = readUInt(input, 32, offset + (isBigEndian ? 4 : 0), isBigEndian);
-  if (high > 0x1f_ff_ff) {
-    throw new TypeError("Invalid Tiff. Value too large");
-  }
   return high * 2 ** 32 + low;
 }
 
@@ -26,6 +26,7 @@ function readValue(
   type: number,
   offset: number,
   isBigEndian: boolean,
+  isBigTiff: boolean,
 ): number | undefined {
   switch (type) {
     case TYPE_SHORT: {
@@ -35,7 +36,15 @@ function readValue(
       return readUInt(input, 32, offset, isBigEndian);
     }
     case TYPE_LONG8: {
-      return readUInt64(input, offset, isBigEndian);
+      // LONG8 only exists in BigTIFF, where the value field is 8 bytes
+      if (!isBigTiff) {
+        return undefined;
+      }
+      const value = readUInt64(input, offset, isBigEndian);
+      if (!Number.isSafeInteger(value)) {
+        throw new TypeError("Invalid Tiff. Value too large");
+      }
+      return value;
     }
   }
 }
@@ -66,11 +75,17 @@ export const TIFF: IImage = {
         throw new TypeError("Invalid BigTIFF header");
       }
       const ifdOffset = readUInt64(input, 8, isBigEndian);
+      if (!(ifdOffset + 8 <= input.length)) {
+        throw new TypeError("Invalid Tiff. IFD offset out of bounds");
+      }
       entryCount = readUInt64(input, ifdOffset, isBigEndian);
       entriesOffset = ifdOffset + 8;
       entrySize = 20;
     } else {
       const ifdOffset = readUInt(input, 32, 4, isBigEndian);
+      if (!(ifdOffset + 2 <= input.length)) {
+        throw new TypeError("Invalid Tiff. IFD offset out of bounds");
+      }
       entryCount = readUInt(input, 16, ifdOffset, isBigEndian);
       entriesOffset = ifdOffset + 2;
       entrySize = 12;
@@ -78,22 +93,24 @@ export const TIFF: IImage = {
 
     // Each entry: tag (2), type (2), count (4 or 8), then the value (4 or 8)
     const tags: Record<number, number | undefined> = {};
-    for (let index = 0; index < entryCount; index++) {
+    for (let index = 0; index < Math.min(entryCount, MAX_ENTRIES); index++) {
       const offset = entriesOffset + index * entrySize;
       if (offset + entrySize > input.length) {
         break;
       }
       const code = readUInt(input, 16, offset, isBigEndian);
       const type = readUInt(input, 16, offset + 2, isBigEndian);
-      const length = isBigTiff
+      // Only single values are stored inline, so only those can be the size
+      const count = isBigTiff
         ? readUInt64(input, offset + 4, isBigEndian)
         : readUInt(input, 32, offset + 4, isBigEndian);
-      if (length === 1) {
+      if (count === 1) {
         tags[code] = readValue(
           input,
           type,
           offset + (isBigTiff ? 12 : 8),
           isBigEndian,
+          isBigTiff,
         );
       }
       if (tags[TAG_WIDTH] && tags[TAG_HEIGHT]) {
