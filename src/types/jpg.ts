@@ -107,16 +107,20 @@ function validateInput(input: Uint8Array, index: number): void {
   }
 }
 
-// Find the 0xFF that starts the next marker, skipping extraneous bytes and 0xFF fill bytes
+// Find the 0xFF that starts the next marker, skipping extraneous bytes, 0xFF fill bytes
+// and stuffed 0xFF 0x00 pairs (which are data, not markers)
 function findMarker(input: Uint8Array, index: number): number {
   let marker = input.indexOf(0xff, index);
-  if (marker === -1) {
-    throw new TypeError("Invalid JPG, marker table corrupted");
+  while (marker !== -1) {
+    while (input[marker + 1] === 0xff) {
+      marker++;
+    }
+    if (input[marker + 1] !== 0x00) {
+      return marker;
+    }
+    marker = input.indexOf(0xff, marker + 2);
   }
-  while (input[marker + 1] === 0xff) {
-    marker++;
-  }
-  return marker;
+  throw new TypeError("Invalid JPG, marker table corrupted");
 }
 
 export const JPG: IImage = {
@@ -159,6 +163,12 @@ export const JPG: IImage = {
           orientation,
           width: size.width,
         };
+      }
+
+      // 0xFFDA is the start of scan (SOS): entropy-coded data follows, and the frame
+      // header (SOF) always comes before it, so an unsupported SOF type was used
+      if (next === 0xda) {
+        break;
       }
 
       // move to the next block
