@@ -37,6 +37,10 @@ export function imageMeta(input: Uint8Array): ImageMeta {
       if (!Number.isFinite(size.width) || !Number.isFinite(size.height)) {
         throw new TypeError(`Invalid ${type}, truncated or corrupt input`);
       }
+      // A zero height is allowed for one-dimensional textures (ktx)
+      if (size.width! <= 0 || size.height! < 0) {
+        throw new TypeError(`Invalid ${type}, zero or negative size`);
+      }
       size.type = type;
       return size;
     }
