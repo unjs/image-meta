@@ -2,39 +2,61 @@
 
 [![npm version][npm-version-src]][npm-version-href]
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
-[![bundle][bundle-src]][bundle-href]
 [![Codecov][codecov-src]][codecov-href]
+[![bundle][bundle-src]][bundle-href]
 
-Detect image type and size using pure javascript.
+Detect image type and size using pure JavaScript. It has no dependencies and works in Node.js, browsers and other runtimes.
 
 ## Usage
-
-Install package:
-
-```sh
-# npm
-npm install image-meta
-
-# yarn
-yarn add image-meta
-
-# pnpm
-pnpm install image-meta
-
-# bun
-bun install image-meta
-```
 
 ```ts
 import { imageMeta } from "image-meta";
 
-const data = await fetch(url).then((res) => res.buffer());
+const res = await fetch(url);
+const data = new Uint8Array(await res.arrayBuffer());
 
-// Meta contains { type, width?, height?, orientation? }
 const meta = imageMeta(data);
+// => { type: "png", width: 123, height: 456 }
 ```
 
-**Note:** `imageMeta` throws an error if either data is not a `Buffer`/`Uint8Array`, or data is invalid or type cannot be determined. You should wrap it into a `try/catch` statement to handle errors.
+In Node.js, a `Buffer` works as input because it is a `Uint8Array`:
+
+```ts
+import { readFile } from "node:fs/promises";
+import { imageMeta } from "image-meta";
+
+const meta = imageMeta(await readFile("./image.jpg"));
+```
+
+The type is detected from the file contents, not the file extension.
+
+### Result
+
+```ts
+type ImageMeta = {
+  type?: string; // detected format, e.g. "png"
+  width: number | undefined;
+  height: number | undefined;
+  orientation?: number; // EXIF orientation (jpg)
+  images?: Omit<ImageMeta, "images">[]; // all embedded images (ico, cur, icns)
+};
+```
+
+### Error handling
+
+`imageMeta` throws an error if the input is not a `Uint8Array`, the format is unsupported, or the data is invalid. Wrap calls that take untrusted input in `try/catch`:
+
+```ts
+try {
+  const meta = imageMeta(data);
+} catch (error) {
+  // Not a supported image
+}
+```
+
+## Supported formats
+
+`avif`, `bmp`, `cur`, `dds`, `gif`, `heic`, `icns`, `ico`, `j2c`, `jp2`, `jpg`, `ktx`, `png`, `pnm`, `psd`, `svg`, `tga`, `tiff`, `webp`
 
 ## Development
 
@@ -43,6 +65,8 @@ const meta = imageMeta(data);
 - Enable [Corepack](https://github.com/nodejs/corepack) using `corepack enable`
 - Install dependencies using `pnpm install`
 - Run interactive tests using `pnpm dev`
+
+See [AGENTS.md](./AGENTS.md) for the project layout and how to add a new format.
 
 ## License
 
