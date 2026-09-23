@@ -1,4 +1,4 @@
-// NOTE: we only support baseline and progressive JPGs here
+// NOTE: we only support non-hierarchical JPGs here
 // due to the structure of the loader class, we only get a buffer
 // with a maximum size of 4096 bytes. so if the SOF marker is outside
 // if this range we can't detect the file size correctly.
@@ -149,8 +149,14 @@ export const JPG: IImage = {
       // 0xFFC0 is baseline standard(SOF)
       // 0xFFC1 is baseline optimized(SOF)
       // 0xFFC2 is progressive(SOF2)
+      // 0xFFC3 is lossless(SOF3)
+      // 0xFFC9 is arithmetic sequential(SOF9)
+      // 0xFFCA is arithmetic progressive(SOF10)
+      // 0xFFCB is arithmetic lossless(SOF11)
+      // Differential SOF5-7 and SOF13-15 are skipped: they only occur in hierarchical
+      // mode, where frames may be downscaled and the image size is in the DHP (0xFFDE)
       next = input[marker + 1];
-      if (next === 0xc0 || next === 0xc1 || next === 0xc2) {
+      if ((next >= 0xc0 && next <= 0xc3) || (next >= 0xc9 && next <= 0xcb)) {
         const size = extractSize(input, marker + 5);
 
         // TODO: is orientation=0 a valid answer here?
