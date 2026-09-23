@@ -20,6 +20,10 @@ export function imageMeta(input: Uint8Array): ImageMeta {
   if (type !== undefined && type in typeHandlers) {
     const size = typeHandlers[type].calculate(input);
     if (size !== undefined) {
+      // Reading past the end of a truncated input yields NaN or undefined
+      if (!Number.isFinite(size.width) || !Number.isFinite(size.height)) {
+        throw new TypeError(`Invalid ${type}, truncated or corrupt input`);
+      }
       size.type = type;
       return size;
     }

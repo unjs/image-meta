@@ -36,6 +36,11 @@ export const WEBP: IImage = {
   },
 
   calculate(input) {
+    // Every variant reads its size from the first 10 bytes of chunk data
+    if (input.length < 30) {
+      throw new TypeError("Invalid WebP, truncated input");
+    }
+
     const chunkHeader = toUTF8String(input, 12, 16);
     input = input.slice(20, 30);
 
