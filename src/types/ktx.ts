@@ -2,10 +2,17 @@ import type { IImage } from "./interface";
 import { toUTF8String, readUInt32LE } from "./utils";
 
 export const KTX: IImage = {
-  validate: (input) => toUTF8String(input, 1, 7) === "KTX 11",
+  validate: (input) => {
+    const signature = toUTF8String(input, 1, 7);
+    return signature === "KTX 11" || signature === "KTX 20";
+  },
 
-  calculate: (input) => ({
-    height: readUInt32LE(input, 40),
-    width: readUInt32LE(input, 36),
-  }),
+  calculate: (input) => {
+    // KTX 2.0 has pixelWidth at 20, KTX 1.1 has it at 36 (followed by pixelHeight)
+    const offset = input[5] === 0x32 ? 20 : 36;
+    return {
+      height: readUInt32LE(input, offset + 4),
+      width: readUInt32LE(input, offset),
+    };
+  },
 };
