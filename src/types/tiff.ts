@@ -1,98 +1,108 @@
 // based on http://www.compix.com/fileformattif.htm
-// TO-DO: support big-endian as well
+// and https://www.awaresystems.be/imaging/tiff/bigtiff.html
 import { readUInt, toHexString, toUTF8String } from "./utils";
 import type { IImage } from "./interface";
 
-// Read IFD (image-file-directory) into a buffer
-function readIFD(buffer: Uint8Array, isBigEndian: boolean) {
-  const ifdOffset = readUInt(buffer, 32, 4, isBigEndian);
+const TAG_WIDTH = 256;
+const TAG_HEIGHT = 257;
 
-  // read only till the end of the file
-  let bufferSize = 1024;
-  const fileSize = buffer.length;
-  if (ifdOffset + bufferSize > fileSize) {
-    bufferSize = fileSize - ifdOffset - 10;
+const TYPE_SHORT = 3;
+const TYPE_LONG = 4;
+const TYPE_LONG8 = 16;
+
+// Read a 64-bit unsigned integer, as long as it fits in a safe integer
+function readUInt64(input: Uint8Array, offset: number, isBigEndian: boolean) {
+  const high = readUInt(input, 32, offset + (isBigEndian ? 0 : 4), isBigEndian);
+  const low = readUInt(input, 32, offset + (isBigEndian ? 4 : 0), isBigEndian);
+  if (high > 0x1f_ff_ff) {
+    throw new TypeError("Invalid Tiff. Value too large");
   }
-
-  return buffer.slice(ifdOffset + 2, ifdOffset + 2 + bufferSize);
+  return high * 2 ** 32 + low;
 }
 
-// Read the value of a SHORT (3) or LONG (4) tag stored inline in the entry
+// Read the value of a tag stored inline in the IFD entry
 function readValue(
-  buffer: Uint8Array,
+  input: Uint8Array,
   type: number,
+  offset: number,
   isBigEndian: boolean,
-): number {
-  return readUInt(buffer, type === 3 ? 16 : 32, 8, isBigEndian);
-}
-
-// move to the next tag
-function nextTag(buffer: Uint8Array) {
-  if (buffer.length > 24) {
-    return buffer.slice(12);
-  }
-}
-
-// Extract IFD tags from TIFF metadata
-function extractTags(buffer: Uint8Array, isBigEndian: boolean) {
-  const tags: { [key: number]: number } = {};
-
-  let temp: Uint8Array | undefined = buffer;
-  while (temp && temp.length > 0) {
-    const code = readUInt(temp, 16, 0, isBigEndian);
-    const type = readUInt(temp, 16, 2, isBigEndian);
-    const length = readUInt(temp, 32, 4, isBigEndian);
-
-    // 0 means end of IFD
-    if (code === 0) {
-      break;
-    } else {
-      // 256 is width, 257 is height
-      // if (code === 256 || code === 257) {
-      if (length === 1 && (type === 3 || type === 4)) {
-        tags[code] = readValue(temp, type, isBigEndian);
-      }
-
-      // move to the next tag
-      temp = nextTag(temp);
+): number | undefined {
+  switch (type) {
+    case TYPE_SHORT: {
+      return readUInt(input, 16, offset, isBigEndian);
     }
-  }
-
-  return tags;
-}
-
-// Test if the TIFF is Big Endian or Little Endian
-function determineEndianness(input: Uint8Array) {
-  const signature = toUTF8String(input, 0, 2);
-  if (signature === "II") {
-    return "LE";
-  } else if (signature === "MM") {
-    return "BE";
+    case TYPE_LONG: {
+      return readUInt(input, 32, offset, isBigEndian);
+    }
+    case TYPE_LONG8: {
+      return readUInt64(input, offset, isBigEndian);
+    }
   }
 }
 
 const signatures = new Set([
-  // '492049', // currently not supported
   "49492a00", // Little endian
   "4d4d002a", // Big Endian
-  // '4d4d002a', // BigTIFF > 4GB. currently not supported
+  "49492b00", // BigTIFF Little Endian
+  "4d4d002b", // BigTIFF Big Endian
 ]);
 
 export const TIFF: IImage = {
   validate: (input) => signatures.has(toHexString(input, 0, 4)),
 
   calculate(input) {
-    // Determine BE/LE
-    const isBigEndian = determineEndianness(input) === "BE";
+    const isBigEndian = toUTF8String(input, 0, 2) === "MM";
+    const isBigTiff = readUInt(input, 16, 2, isBigEndian) === 43;
 
-    // read the IFD
-    const ifdBuffer = readIFD(input, isBigEndian);
+    // Locate the first IFD (image-file-directory) and its entry layout
+    let entryCount: number;
+    let entriesOffset: number;
+    let entrySize: number;
+    if (isBigTiff) {
+      // BigTIFF header: offset byte size (always 8) and a reserved zero
+      const byteSize = readUInt(input, 16, 4, isBigEndian);
+      const reserved = readUInt(input, 16, 6, isBigEndian);
+      if (byteSize !== 8 || reserved !== 0) {
+        throw new TypeError("Invalid BigTIFF header");
+      }
+      const ifdOffset = readUInt64(input, 8, isBigEndian);
+      entryCount = readUInt64(input, ifdOffset, isBigEndian);
+      entriesOffset = ifdOffset + 8;
+      entrySize = 20;
+    } else {
+      const ifdOffset = readUInt(input, 32, 4, isBigEndian);
+      entryCount = readUInt(input, 16, ifdOffset, isBigEndian);
+      entriesOffset = ifdOffset + 2;
+      entrySize = 12;
+    }
 
-    // extract the tags from the IFD
-    const tags = extractTags(ifdBuffer, isBigEndian);
+    // Each entry: tag (2), type (2), count (4 or 8), then the value (4 or 8)
+    const tags: Record<number, number | undefined> = {};
+    for (let index = 0; index < entryCount; index++) {
+      const offset = entriesOffset + index * entrySize;
+      if (offset + entrySize > input.length) {
+        break;
+      }
+      const code = readUInt(input, 16, offset, isBigEndian);
+      const type = readUInt(input, 16, offset + 2, isBigEndian);
+      const length = isBigTiff
+        ? readUInt64(input, offset + 4, isBigEndian)
+        : readUInt(input, 32, offset + 4, isBigEndian);
+      if (length === 1) {
+        tags[code] = readValue(
+          input,
+          type,
+          offset + (isBigTiff ? 12 : 8),
+          isBigEndian,
+        );
+      }
+      if (tags[TAG_WIDTH] && tags[TAG_HEIGHT]) {
+        break;
+      }
+    }
 
-    const width = tags[256];
-    const height = tags[257];
+    const width = tags[TAG_WIDTH];
+    const height = tags[TAG_HEIGHT];
 
     if (!width || !height) {
       throw new TypeError("Invalid Tiff. Missing tags");
