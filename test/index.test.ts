@@ -100,4 +100,22 @@ describe("image-meta", () => {
     expect(() => imageMeta(input)).toThrow(TypeError);
     expect(performance.now() - start).toBeLessThan(1000);
   });
+
+  test("icns: repeated entries are reported once per icon type", () => {
+    // Alternating ic07 and ic08 entries, each an 8-byte header without data
+    const input = new Uint8Array(8 + 1_000_000 * 8);
+    const view = new DataView(input.buffer);
+    const [ic07, ic08] = ["ic07", "ic08"].map((type) =>
+      new TextEncoder().encode(type),
+    );
+    input.set(new TextEncoder().encode("icns"));
+    view.setUint32(4, input.length);
+    for (let offset = 8; offset < input.length; offset += 8) {
+      input.set(offset % 16 ? ic07 : ic08, offset);
+      view.setUint32(offset + 4, 8);
+    }
+    const meta = imageMeta(input);
+    expect(meta).toMatchObject({ width: 256, height: 256 });
+    expect(meta.images).toHaveLength(2);
+  });
 });

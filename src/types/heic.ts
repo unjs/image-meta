@@ -7,8 +7,15 @@ const FTYP = toTagCode("ftyp");
 const ISPE = toTagCode("ispe");
 const CLAP = toTagCode("clap");
 
-// Read the size of each image from the item properties (meta > iprp > ipco)
-function readImageSizes(input: Uint8Array): Size[] {
+// Pick dimensions with largest area (width * height), keeping the earlier image on a tie
+function larger(largest: Size | undefined, image: Size): Size {
+  return !largest || image.width * image.height > largest.width * largest.height
+    ? image
+    : largest;
+}
+
+// Read the size of the largest image from the item properties (meta > iprp > ipco)
+function readLargestImageSize(input: Uint8Array): Size {
   const metaBox = findBox(input, "meta");
   const iprpBox =
     metaBox &&
@@ -20,7 +27,10 @@ function readImageSizes(input: Uint8Array): Size[] {
     throw new TypeError("Invalid HEIF, no ipco box found");
   }
 
-  const images: Size[] = [];
+  // Track the largest image so far and the latest one, which a following clap box may
+  // still crop, instead of collecting a size per ispe box
+  let largest: Size | undefined;
+  let image: Size | undefined;
   const end = ipcoBox.offset + ipcoBox.size;
   let offset = ipcoBox.offset + 8;
   while (offset + 8 <= end) {
@@ -35,15 +45,18 @@ function readImageSizes(input: Uint8Array): Size[] {
       if (size < 20) {
         throw new TypeError("Invalid HEIF, corrupt ispe box");
       }
-      images.push({
+      // A new image starts, so the previous one can no longer be cropped
+      if (image) {
+        largest = larger(largest, image);
+      }
+      image = {
         width: readUInt32BE(input, offset + 12),
         height: readUInt32BE(input, offset + 16),
-      });
+      };
     }
 
     // Clean aperture crops the preceding image: width and height as fractions
-    if (type === CLAP && size >= 24 && images.length > 0) {
-      const image = images.at(-1)!;
+    if (type === CLAP && size >= 24 && image) {
       const widthD = readUInt32BE(input, offset + 12);
       const heightD = readUInt32BE(input, offset + 20);
       if (widthD > 0 && heightD > 0) {
@@ -55,10 +68,10 @@ function readImageSizes(input: Uint8Array): Size[] {
     offset += size;
   }
 
-  if (images.length === 0) {
+  if (!image) {
     throw new TypeError("Invalid HEIF, no ispe box found");
   }
-  return images;
+  return larger(largest, image);
 }
 
 // AVIF still image and image sequence brands, compared as 32-bit codes to scan quickly
@@ -96,15 +109,5 @@ export function detectHeifType(input: Uint8Array): "avif" | "heic" | undefined {
 export const HEIC: IImage = {
   validate: (input) => detectHeifType(input) === "heic",
 
-  calculate: (input) => {
-    // Pick dimensions with largest area (width * height)
-    const [first, ...rest] = readImageSizes(input);
-    let largest = first;
-    for (const image of rest) {
-      if (image.width * image.height > largest.width * largest.height) {
-        largest = image;
-      }
-    }
-    return largest;
-  },
+  calculate: (input) => readLargestImageSize(input),
 };

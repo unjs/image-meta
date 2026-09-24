@@ -109,11 +109,15 @@ export const ICNS: IImage = {
     let imageOffset = SIZE_HEADER;
 
     const images: ISize[] = [];
+    // A valid icns lists each icon type once, so repeated entries are skipped:
+    // the result then holds at most one image per known type, whatever the input size
+    const seenTypes = new Set<string>();
     while (imageOffset < fileLength && imageOffset < inputLength) {
       const [type, entryLength] = readImageHeader(input, imageOffset);
       imageOffset += entryLength;
       // Skip entries that are not icons (e.g. "TOC ", "icnV", "info")
-      if (type !== undefined) {
+      if (type !== undefined && !seenTypes.has(type)) {
+        seenTypes.add(type);
         images.push(getImageSize(type));
       }
     }
