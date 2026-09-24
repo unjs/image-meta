@@ -26,7 +26,7 @@ const units: { [unit: string]: number } = {
   ex: 8,
   m: (96 / INCH_CM) * 100,
   mm: 96 / INCH_CM / 10,
-  pc: 96 / 72 / 12,
+  pc: 96 / 6,
   pt: 96 / 72,
   px: 1,
 };
