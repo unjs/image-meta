@@ -57,20 +57,38 @@ function readImageSizes(input: Uint8Array): Size[] {
   return images;
 }
 
-export const HEIC: IImage = {
-  validate: (input) => {
-    const ftypBox = findBox(input, "ftyp");
-    if (!ftypBox) return false;
+// AVIF still image and image sequence brands, compared as 32-bit codes to scan quickly
+const AVIF_BRANDS = new Set(
+  ["avif", "avis"].map((brand) =>
+    readUInt32BE(new TextEncoder().encode(brand)),
+  ),
+);
 
-    const majorBrand = toUTF8String(
-      input,
-      ftypBox.offset + 8,
-      ftypBox.offset + 12,
-    );
-    return ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(
-      majorBrand,
-    );
-  },
+// Tell AVIF from HEIC by the brands of the file type box (ftyp)
+export function detectHeifType(input: Uint8Array): "avif" | "heic" | undefined {
+  const ftypBox = findBox(input, "ftyp");
+  if (!ftypBox || ftypBox.size < 12) return undefined;
+
+  // Major brand, minor version, then compatible brands up to the end of the box
+  const start = ftypBox.offset + 8;
+  if (AVIF_BRANDS.has(readUInt32BE(input, start))) return "avif";
+
+  // AVIF may have a generic HEIF / MIAF major brand and list avif or avis as compatible
+  const majorBrand = toUTF8String(input, start, start + 4);
+  if (["mif1", "msf1", "miaf"].includes(majorBrand)) {
+    const end = ftypBox.offset + ftypBox.size;
+    for (let offset = start + 8; offset + 4 <= end; offset += 4) {
+      if (AVIF_BRANDS.has(readUInt32BE(input, offset))) return "avif";
+    }
+  }
+
+  return ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(majorBrand)
+    ? "heic"
+    : undefined;
+}
+
+export const HEIC: IImage = {
+  validate: (input) => detectHeifType(input) === "heic",
 
   calculate: (input) => {
     // Pick dimensions with largest area (width * height)

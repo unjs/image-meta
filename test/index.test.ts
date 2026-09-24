@@ -64,4 +64,14 @@ describe("image-meta", () => {
     expect(() => imageMeta(input)).toThrow(TypeError);
     expect(performance.now() - start).toBeLessThan(1000);
   });
+
+  test("heic: large ftyp compatible brands are scanned quickly", () => {
+    // A generic major brand makes the detector look for avif in every compatible brand
+    const input = new Uint8Array(16 * 1024 * 1024);
+    new DataView(input.buffer).setUint32(0, input.length);
+    input.set(new TextEncoder().encode("ftypmif1"), 4);
+    const start = performance.now();
+    expect(() => imageMeta(input)).toThrow(TypeError);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });
