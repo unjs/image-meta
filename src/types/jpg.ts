@@ -13,6 +13,11 @@ const TIFF_BYTE_ALIGN_BYTES = 2;
 const BIG_ENDIAN_BYTE_ALIGN = "4d4d";
 const LITTLE_ENDIAN_BYTE_ALIGN = "4949";
 
+// The TIFF header is the byte align, the magic number (42) and the IFD0 offset
+const TIFF_MAGIC = 42;
+const TIFF_MAGIC_BYTES = 2;
+const TIFF_HEADER_BYTES = 8;
+
 // Each entry is exactly 12 bytes
 const IDF_ENTRY_BYTES = 12;
 const NUM_DIRECTORY_ENTRIES_BYTES = 2;
@@ -29,16 +34,30 @@ function extractSize(input: Uint8Array, index: number): ISize {
 }
 
 function extractOrientation(exifBlock: Uint8Array, isBigEndian: boolean) {
-  // TODO: assert that this contains 0x002A
-  // let STATIC_MOTOROLA_TIFF_HEADER_BYTES = 2
-  // let TIFF_IMAGE_FILE_DIRECTORY_BYTES = 4
+  // The byte align is followed by the TIFF magic number
+  const magicOffset = EXIF_HEADER_BYTES + TIFF_BYTE_ALIGN_BYTES;
+  if (readUInt(exifBlock, 16, magicOffset, isBigEndian) !== TIFF_MAGIC) {
+    return;
+  }
 
-  // TODO: derive from TIFF_IMAGE_FILE_DIRECTORY_BYTES
-  const idfOffset = 8;
-
-  // IDF osset works from right after the header bytes
+  // IDF offset works from right after the header bytes
   // (so the offset includes the tiff byte align)
+  const idfOffset = readUInt(
+    exifBlock,
+    32,
+    magicOffset + TIFF_MAGIC_BYTES,
+    isBigEndian,
+  );
   const offset = EXIF_HEADER_BYTES + idfOffset;
+
+  // Skip if IFD0 overlaps the TIFF header or its entry count is outside the block
+  // (a truncated header reads as NaN, which fails these checks too)
+  const isInBounds =
+    idfOffset >= TIFF_HEADER_BYTES &&
+    offset + NUM_DIRECTORY_ENTRIES_BYTES <= exifBlock.length;
+  if (!isInBounds) {
+    return;
+  }
 
   const idfDirectoryEntries = readUInt(exifBlock, 16, offset, isBigEndian);
 
