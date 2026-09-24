@@ -74,4 +74,30 @@ describe("image-meta", () => {
     expect(() => imageMeta(input)).toThrow(TypeError);
     expect(performance.now() - start).toBeLessThan(1000);
   });
+
+  test("heic: unknown input made of boxes is rejected quickly", () => {
+    // Detection only checks for a file type box (ftyp) at the start of the input
+    const input = new Uint8Array(16 * 1024 * 1024);
+    const freeBox = new Uint8Array([0, 0, 0, 8, 0x66, 0x72, 0x65, 0x65]);
+    for (let offset = 0; offset < input.length; offset += 8) {
+      input.set(freeBox, offset);
+    }
+    const start = performance.now();
+    expect(() => imageMeta(input)).toThrow(TypeError);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  test("heic: many top-level boxes are scanned quickly", () => {
+    // Box types are compared as numbers, not decoded to strings one by one
+    const input = new Uint8Array(16 * 1024 * 1024);
+    const freeBox = new Uint8Array([0, 0, 0, 8, 0x66, 0x72, 0x65, 0x65]);
+    for (let offset = 16; offset < input.length; offset += 8) {
+      input.set(freeBox, offset);
+    }
+    new DataView(input.buffer).setUint32(0, 16);
+    input.set(new TextEncoder().encode("ftypheic"), 4);
+    const start = performance.now();
+    expect(() => imageMeta(input)).toThrow(TypeError);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });

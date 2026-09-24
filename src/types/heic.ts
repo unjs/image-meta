@@ -1,7 +1,11 @@
 import type { IImage } from "./interface.ts";
-import { findBox, readUInt32BE, toUTF8String } from "./utils.ts";
+import { findBox, readUInt32BE, toTagCode, toUTF8String } from "./utils.ts";
 
 type Size = { width: number; height: number };
+
+const FTYP = toTagCode("ftyp");
+const ISPE = toTagCode("ispe");
+const CLAP = toTagCode("clap");
 
 // Read the size of each image from the item properties (meta > iprp > ipco)
 function readImageSizes(input: Uint8Array): Size[] {
@@ -24,10 +28,10 @@ function readImageSizes(input: Uint8Array): Size[] {
     if (size < 8 || offset + size > end) {
       throw new TypeError("Invalid HEIF, corrupt ipco box");
     }
-    const name = toUTF8String(input, offset + 4, offset + 8);
+    const type = readUInt32BE(input, offset + 4);
 
     // Image spatial extents: full box header, then width and height
-    if (name === "ispe") {
+    if (type === ISPE) {
       if (size < 20) {
         throw new TypeError("Invalid HEIF, corrupt ispe box");
       }
@@ -38,7 +42,7 @@ function readImageSizes(input: Uint8Array): Size[] {
     }
 
     // Clean aperture crops the preceding image: width and height as fractions
-    if (name === "clap" && size >= 24 && images.length > 0) {
+    if (type === CLAP && size >= 24 && images.length > 0) {
       const image = images.at(-1)!;
       const widthD = readUInt32BE(input, offset + 12);
       const heightD = readUInt32BE(input, offset + 20);
@@ -58,26 +62,28 @@ function readImageSizes(input: Uint8Array): Size[] {
 }
 
 // AVIF still image and image sequence brands, compared as 32-bit codes to scan quickly
-const AVIF_BRANDS = new Set(
-  ["avif", "avis"].map((brand) =>
-    readUInt32BE(new TextEncoder().encode(brand)),
-  ),
-);
+const AVIF_BRANDS = new Set(["avif", "avis"].map((brand) => toTagCode(brand)));
 
 // Tell AVIF from HEIC by the brands of the file type box (ftyp)
 export function detectHeifType(input: Uint8Array): "avif" | "heic" | undefined {
-  const ftypBox = findBox(input, "ftyp");
-  if (!ftypBox || ftypBox.size < 12) return undefined;
+  // ISO BMFF files start with the file type box, so only offset 0 is checked:
+  // arbitrary input is then rejected without walking all of its boxes
+  const ftypSize = readUInt32BE(input, 0);
+  if (
+    readUInt32BE(input, 4) !== FTYP ||
+    ftypSize < 12 ||
+    ftypSize > input.length
+  ) {
+    return undefined;
+  }
 
   // Major brand, minor version, then compatible brands up to the end of the box
-  const start = ftypBox.offset + 8;
-  if (AVIF_BRANDS.has(readUInt32BE(input, start))) return "avif";
+  if (AVIF_BRANDS.has(readUInt32BE(input, 8))) return "avif";
 
   // AVIF may have a generic HEIF / MIAF major brand and list avif or avis as compatible
-  const majorBrand = toUTF8String(input, start, start + 4);
+  const majorBrand = toUTF8String(input, 8, 12);
   if (["mif1", "msf1", "miaf"].includes(majorBrand)) {
-    const end = ftypBox.offset + ftypBox.size;
-    for (let offset = start + 8; offset + 4 <= end; offset += 4) {
+    for (let offset = 16; offset + 4 <= ftypSize; offset += 4) {
       if (AVIF_BRANDS.has(readUInt32BE(input, offset))) return "avif";
     }
   }

@@ -63,6 +63,11 @@ export function readUInt(
   return methods[methodName](input, offset);
 }
 
+// Encode a 4-character tag (box type, brand, ...) as the number readUInt32BE reads for it,
+// so tags in the input are compared without decoding each one to a string
+const encoder = new TextEncoder();
+export const toTagCode = (tag: string) => readUInt32BE(encoder.encode(tag));
+
 const BOX_HEADER_SIZE = 8;
 
 // Find an ISO-BMFF box by name, scanning siblings from startOffset up to endOffset
@@ -72,6 +77,7 @@ export function findBox(
   startOffset = 0,
   endOffset = input.length,
 ) {
+  const boxType = toTagCode(boxName);
   let offset = startOffset;
   while (offset + BOX_HEADER_SIZE <= endOffset) {
     const size = readUInt32BE(input, offset);
@@ -79,7 +85,7 @@ export function findBox(
     if (size < BOX_HEADER_SIZE || offset + size > endOffset) {
       return undefined;
     }
-    if (toUTF8String(input, offset + 4, offset + 8) === boxName) {
+    if (readUInt32BE(input, offset + 4) === boxType) {
       return { offset, size };
     }
     offset += size;

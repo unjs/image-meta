@@ -4,14 +4,21 @@
 // if this range we can't detect the file size correctly.
 
 import type { IImage, ISize } from "./interface.ts";
-import { readUInt, readUInt16BE, toHexString } from "./utils.ts";
+import {
+  readUInt,
+  readUInt16BE,
+  readUInt32BE,
+  toHexString,
+  toTagCode,
+} from "./utils.ts";
 
-const EXIF_MARKER = "45786966";
+// Markers are compared as numbers, so segments are checked without building strings
+const EXIF_MARKER = toTagCode("Exif");
 const APP1_DATA_SIZE_BYTES = 2;
 const EXIF_HEADER_BYTES = 6;
 const TIFF_BYTE_ALIGN_BYTES = 2;
-const BIG_ENDIAN_BYTE_ALIGN = "4d4d";
-const LITTLE_ENDIAN_BYTE_ALIGN = "4949";
+const BIG_ENDIAN_BYTE_ALIGN = 0x4d_4d; // "MM"
+const LITTLE_ENDIAN_BYTE_ALIGN = 0x49_49; // "II"
 
 // The TIFF header is the byte align, the magic number (42) and the IFD0 offset
 const TIFF_MAGIC = 42;
@@ -23,7 +30,7 @@ const IDF_ENTRY_BYTES = 12;
 const NUM_DIRECTORY_ENTRIES_BYTES = 2;
 
 function isEXIF(input: Uint8Array): boolean {
-  return toHexString(input, 2, 6) === EXIF_MARKER;
+  return readUInt32BE(input, 2) === EXIF_MARKER;
 }
 
 function extractSize(input: Uint8Array, index: number): ISize {
@@ -104,11 +111,7 @@ function validateExifBlock(input: Uint8Array, index: number) {
   const exifBlock = input.slice(APP1_DATA_SIZE_BYTES, index);
 
   // Consider byte alignment
-  const byteAlign = toHexString(
-    exifBlock,
-    EXIF_HEADER_BYTES,
-    EXIF_HEADER_BYTES + TIFF_BYTE_ALIGN_BYTES,
-  );
+  const byteAlign = readUInt16BE(exifBlock, EXIF_HEADER_BYTES);
 
   // Ignore Empty EXIF. Validate byte alignment
   const isBigEndian = byteAlign === BIG_ENDIAN_BYTE_ALIGN;

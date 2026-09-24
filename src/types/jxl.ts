@@ -1,6 +1,12 @@
 // based on the JPEG XL spec (ISO/IEC 18181) SizeHeader
 import type { IImage, ISize } from "./interface.ts";
-import { findBox, readUInt32BE, toHexString, toUTF8String } from "./utils.ts";
+import {
+  findBox,
+  readUInt32BE,
+  toHexString,
+  toTagCode,
+  toUTF8String,
+} from "./utils.ts";
 
 // Read `length` bits (least significant first), after the 2-byte codestream signature
 function createBitReader(input: Uint8Array) {
@@ -49,6 +55,9 @@ function calculateCodestream(input: Uint8Array): ISize {
 // The size header is at most 11 bytes into the codestream
 const CODESTREAM_PREFIX_BYTES = 32;
 
+const JXLC = toTagCode("jxlc");
+const JXLP = toTagCode("jxlp");
+
 // Extract the start of the codestream from a JXL container (jxlc box, or jxlp partial boxes)
 function extractCodestream(input: Uint8Array): Uint8Array {
   const parts: Uint8Array[] = [];
@@ -56,7 +65,7 @@ function extractCodestream(input: Uint8Array): Uint8Array {
   let offset = 0;
   while (offset + 8 <= input.length && length < CODESTREAM_PREFIX_BYTES) {
     let size = readUInt32BE(input, offset);
-    const name = toUTF8String(input, offset + 4, offset + 8);
+    const type = readUInt32BE(input, offset + 4);
     let headerSize = 8;
     if (size === 1) {
       // 64-bit box size follows the name
@@ -72,10 +81,11 @@ function extractCodestream(input: Uint8Array): Uint8Array {
       size = input.length - offset;
     }
 
-    if (name === "jxlc" || name === "jxlp") {
+    if (type === JXLC || type === JXLP) {
       // Partial codestream boxes start with a 4-byte index
-      const start = offset + headerSize + (name === "jxlp" ? 4 : 0);
+      const start = offset + headerSize + (type === JXLP ? 4 : 0);
       if (size < start - offset) {
+        const name = type === JXLP ? "jxlp" : "jxlc";
         throw new TypeError(`Invalid JXL, corrupt ${name} box`);
       }
       // Clamp to the input, so a truncated file still yields its size header
@@ -88,7 +98,7 @@ function extractCodestream(input: Uint8Array): Uint8Array {
         parts.push(input.subarray(start, end));
         length += end - start;
       }
-      if (name === "jxlc") {
+      if (type === JXLC) {
         break;
       }
     }

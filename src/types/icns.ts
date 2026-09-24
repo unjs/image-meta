@@ -1,5 +1,5 @@
 import type { IImage, ISize } from "./interface.ts";
-import { toUTF8String, readUInt32BE } from "./utils.ts";
+import { toTagCode, toUTF8String, readUInt32BE } from "./utils.ts";
 
 /**
  * ICNS Header
@@ -74,10 +74,15 @@ const ICON_TYPE_SIZE: { [key: string]: number } = {
   ic10: 1024, // 512 x 512 @2x
 };
 
+// Icon types by their 32-bit code, so entry types are looked up without decoding them
+const ICON_TYPES = new Map(
+  Object.keys(ICON_TYPE_SIZE).map((type) => [toTagCode(type), type] as const),
+);
+
 function readImageHeader(
   input: Uint8Array,
   imageOffset: number,
-): [string, number] {
+): [string | undefined, number] {
   const imageLengthOffset = imageOffset + ENTRY_LENGTH_OFFSET;
   if (imageLengthOffset + 4 > input.length) {
     throw new TypeError("Invalid ICNS");
@@ -87,7 +92,7 @@ function readImageHeader(
   if (entryLength < 8) {
     throw new TypeError("Invalid ICNS");
   }
-  return [toUTF8String(input, imageOffset, imageLengthOffset), entryLength];
+  return [ICON_TYPES.get(readUInt32BE(input, imageOffset)), entryLength];
 }
 
 function getImageSize(type: string): ISize {
@@ -108,7 +113,7 @@ export const ICNS: IImage = {
       const [type, entryLength] = readImageHeader(input, imageOffset);
       imageOffset += entryLength;
       // Skip entries that are not icons (e.g. "TOC ", "icnV", "info")
-      if (type in ICON_TYPE_SIZE) {
+      if (type !== undefined) {
         images.push(getImageSize(type));
       }
     }
