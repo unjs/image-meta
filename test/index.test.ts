@@ -48,6 +48,21 @@ describe("image-meta", () => {
     expect(performance.now() - start).toBeLessThan(1000);
   });
 
+  test("svg: multi-MB root tag does not overflow the stack", () => {
+    // Matching it with a backtracking regex threw a RangeError (from ~4M chars)
+    const filler = "a".repeat(6 * 1024 * 1024);
+    const unterminated = new TextEncoder().encode(
+      "<!--<svg a>--><svg " + filler,
+    );
+    const start = performance.now();
+    expect(() => imageMeta(unterminated)).toThrow(TypeError);
+    expect(performance.now() - start).toBeLessThan(1000);
+    const terminated = new TextEncoder().encode(
+      `<!--<svg a>--><svg width="1" height="2" ${filler}>`,
+    );
+    expect(imageMeta(terminated)).toMatchObject({ width: 1, height: 2 });
+  });
+
   test("pnm: many comment lines are not consumed quadratically", () => {
     const input = new TextEncoder().encode(
       "P2\n" + "#\n".repeat(200_000) + "1 1\n255\n",
