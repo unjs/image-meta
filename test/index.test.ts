@@ -47,4 +47,21 @@ describe("image-meta", () => {
     expect(() => imageMeta(input)).toThrow(TypeError);
     expect(performance.now() - start).toBeLessThan(1000);
   });
+
+  test("pnm: many comment lines are not consumed quadratically", () => {
+    const input = new TextEncoder().encode(
+      "P2\n" + "#\n".repeat(200_000) + "1 1\n255\n",
+    );
+    const start = performance.now();
+    expect(imageMeta(input)).toMatchObject({ width: 1, height: 1 });
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  test("pnm: pam header without size is not consumed quadratically", () => {
+    // Without WIDTH and HEIGHT, every remaining line is scanned
+    const input = new TextEncoder().encode("P7\n" + "a\n".repeat(200_000));
+    const start = performance.now();
+    expect(() => imageMeta(input)).toThrow(TypeError);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });
