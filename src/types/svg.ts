@@ -40,11 +40,12 @@ function parseLength(len: string) {
   if (!m) {
     return undefined;
   }
-  return Math.round(Number(m[1]) * (units[m[2]] || 1));
+  return Number(m[1]) * (units[m[2]] || 1);
 }
 
 function parseViewbox(viewbox: string): IAttributes {
-  // min-x, min-y, width and height, separated by whitespace and/or a comma
+  // min-x, min-y, width and height, separated by whitespace and/or a comma.
+  // Kept unrounded, as they set the aspect ratio
   const bounds = viewbox.trim().split(/[\s,]+/);
   return {
     height: parseLength(bounds[3]) as number,
@@ -57,9 +58,9 @@ function parseAttributes(root: string): IAttributes {
   const height = root.match(extractorRegExps.height);
   const viewbox = root.match(extractorRegExps.viewbox);
   return {
-    height: height && (parseLength(height[2]) as number),
+    height: height && Math.round(parseLength(height[2]) as number),
     viewbox: viewbox && (parseViewbox(viewbox[2]) as IAttributes),
-    width: width && (parseLength(width[2]) as number),
+    width: width && Math.round(parseLength(width[2]) as number),
   };
 }
 
@@ -70,23 +71,31 @@ function calculateByDimensions(attrs: IAttributes): ISize {
   };
 }
 
+// Nearest whole pixel, but a non-zero (sub-pixel) length never becomes 0
+function toPixels(length: number) {
+  return Math.max(1, Math.round(length));
+}
+
 function calculateByViewbox(attrs: IAttributes, viewbox: IAttributes): ISize {
-  const ratio = (viewbox.width as number) / (viewbox.height as number);
+  const vbWidth = viewbox.width as number;
+  const vbHeight = viewbox.height as number;
+  // Scale by both sides rather than a pre-divided ratio, which is inexact
+  // (e.g. 21 / (3 / 17) = 118.99999999999999)
   if (attrs.width) {
     return {
-      height: Math.floor(attrs.width / ratio),
+      height: toPixels((attrs.width * vbHeight) / vbWidth),
       width: attrs.width,
     };
   }
   if (attrs.height) {
     return {
       height: attrs.height,
-      width: Math.floor(attrs.height * ratio),
+      width: toPixels((attrs.height * vbWidth) / vbHeight),
     };
   }
   return {
-    height: viewbox.height as number,
-    width: viewbox.width as number,
+    height: toPixels(vbHeight),
+    width: toPixels(vbWidth),
   };
 }
 
