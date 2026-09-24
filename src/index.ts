@@ -30,8 +30,12 @@ export function imageMeta(input: Uint8Array): ImageMeta {
         }
       }
 
-      // Reading past the end of a truncated input yields NaN or undefined
-      if (!Number.isFinite(size.width) || !Number.isFinite(size.height)) {
+      // Reading past the end of a truncated input yields NaN or undefined, and a text header
+      // (svg, pnm) can declare a size too large to be exact (e.g. `width="1e20"`)
+      if (
+        !Number.isSafeInteger(size.width) ||
+        !Number.isSafeInteger(size.height)
+      ) {
         throw new TypeError(`Invalid ${type}, truncated or corrupt input`);
       }
       // A zero height is allowed for one-dimensional textures (ktx)
