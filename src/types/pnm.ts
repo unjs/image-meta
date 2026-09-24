@@ -10,78 +10,83 @@ const PNMTypes = {
   P6: "ppm",
   P7: "pam",
   PF: "pfm",
+  Pf: "pfm",
 } as const;
 
 type ValidSignature = keyof typeof PNMTypes;
-type Handler = (lines: Iterable<string>) => ISize;
+type Handler = (input: Uint8Array) => ISize;
+
+const isLineBreak = (byte: number) => byte === 0x0a || byte === 0x0d;
+// Space, tab, line feed, vertical tab, form feed and carriage return
+const isWhitespace = (byte: number) =>
+  byte === 0x20 || (byte >= 0x09 && byte <= 0x0d);
+
+// Header values are unsigned decimal integers, anything else is NaN (rejected by `imageMeta`)
+const toInteger = (value = "") =>
+  /^\d+$/.test(value) ? Number(value) : Number.NaN;
+
+// A PAM header line with a tag we need, and its value (the next token)
+const PAMLine = /^\s*(width|height|endhdr)(?!\S)\s*(\S*)/i;
 
 const handlers: { [type: string]: Handler } = {
-  default: (lines) => {
-    let dimensions: string[] = [];
-
-    for (const line of lines) {
-      if (line[0] === "#") {
-        continue;
-      }
-      dimensions = line.split(" ");
-      break;
-    }
-
-    if (dimensions.length === 2) {
-      return {
-        height: Number.parseInt(dimensions[1], 10),
-        width: Number.parseInt(dimensions[0], 10),
-      };
-    } else {
-      throw new TypeError("Invalid PNM");
-    }
+  // Width and height are the first two tokens after the magic number
+  default: (input) => {
+    const [width, height] = readHeader(input, "tokens");
+    return {
+      height: toInteger(height),
+      width: toInteger(width),
+    };
   },
-  pam: (lines) => {
+  // Header lines are `TAG value` pairs, up to `ENDHDR`
+  pam: (input) => {
     const size: { [key: string]: number } = {};
-    for (const line of lines) {
-      if (line.length > 16 || (line.codePointAt(0) || 0) > 128) {
-        continue;
+    for (const line of readHeader(input, "lines")) {
+      const [, tag = "", value] = PAMLine.exec(line) || [];
+      const key = tag.toLowerCase();
+      if (key === "width" || key === "height") {
+        size[key] = toInteger(value);
       }
-      const [key, value] = line.split(" ");
-      if (key && value) {
-        size[key.toLowerCase()] = Number.parseInt(value, 10);
-      }
-      if (size.height && size.width) {
+      if (key === "endhdr" || ("width" in size && "height" in size)) {
         break;
       }
     }
-
-    if (size.height && size.width) {
-      return {
-        height: size.height,
-        width: size.width,
-      };
-    } else {
-      throw new TypeError("Invalid PAM");
-    }
+    // Missing values are undefined (rejected by `imageMeta`)
+    return {
+      height: size.height,
+      width: size.width,
+    };
   },
 };
 
-// Yields the same lines as `toUTF8String(input, start).split(/[\n\r]+/)`, but lazily
-// decodes chunks cut at line breaks, so the pixel data after the header is never decoded
-function* readLines(input: Uint8Array, start: number): Generator<string> {
-  const isLineBreak = (i: number) => input[i] === 0x0a || input[i] === 0x0d;
-  while (true) {
-    let end = Math.min(start + 1024, input.length);
-    while (end < input.length && !isLineBreak(end)) {
-      end++;
+// Lazily yields the header tokens or lines after the magic number, where `#` comments run to the
+// end of the line and also separate them. It decodes about 1 KB at a time (one decode per short
+// line is slow), and the caller stops iterating once it has the values it needs
+function* readHeader(
+  input: Uint8Array,
+  unit: "tokens" | "lines",
+): Generator<string> {
+  const isSeparator = unit === "lines" ? isLineBreak : isWhitespace;
+  const values = unit === "lines" ? /[^\n\r]+/g : /[^\t-\r ]+/g;
+  let start = 2;
+  while (start < input.length) {
+    // Cut after the last separator outside of a comment, so no token, line or comment is split.
+    // Only a window without one is extended, so at most ~1 KB of pixel data is decoded
+    let end = start;
+    let cut = start;
+    let inComment = false;
+    while (end < input.length && (end - start < 1024 || cut === start)) {
+      const byte = input[end++];
+      inComment = byte === 0x23 /* # */ || (inComment && !isLineBreak(byte));
+      if (!inComment && isSeparator(byte)) {
+        cut = end;
+      }
     }
-    while (end > start && isLineBreak(end - 1)) {
-      end--;
-    }
-    yield* toUTF8String(input, start, end).split(/[\n\r]+/);
     if (end === input.length) {
-      return;
+      cut = end;
     }
-    start = end;
-    while (isLineBreak(start)) {
-      start++;
-    }
+    const text = toUTF8String(input, start, cut).replace(/#[^\n\r]*/g, "\n");
+    yield* text.match(values) || [];
+    start = cut;
   }
 }
 
@@ -92,6 +97,6 @@ export const PNM: IImage = {
     const signature = toUTF8String(input, 0, 2) as ValidSignature;
     const type = PNMTypes[signature];
     const handler = handlers[type] || handlers.default;
-    return handler(readLines(input, 3));
+    return handler(input);
   },
 };
