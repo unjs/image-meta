@@ -37,4 +37,14 @@ describe("image-meta", () => {
       }
     });
   }
+
+  test("svg: unterminated root does not backtrack quadratically", () => {
+    // A root inside a comment passes `validate`, then `calculate` strips it
+    const input = new TextEncoder().encode(
+      "<!--<svg a>-->" + "<svg ".repeat(40_000),
+    );
+    const start = performance.now();
+    expect(() => imageMeta(input)).toThrow(TypeError);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });

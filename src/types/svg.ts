@@ -12,7 +12,8 @@ const commentReg = /<!--[\s\S]*?(?:-->|$)/g;
 
 const extractorRegExps = {
   height: /\sheight=(["'])([^%]+?)\1/,
-  root: svgReg,
+  // Sticky: only matches at `lastIndex`
+  root: new RegExp(svgReg.source, "y"),
   viewbox: /\sviewbox=(["'])([\s\S]+?)\1/i,
   width: /\swidth=(["'])([^%]+?)\1/,
 };
@@ -94,9 +95,11 @@ export const SVG: IImage = {
   validate: (input) => svgReg.test(toUTF8String(input, 0, 1000)),
 
   calculate(input) {
-    const root = toUTF8String(input)
-      .replace(commentReg, "")
-      .match(extractorRegExps.root);
+    const svg = toUTF8String(input).replace(commentReg, "");
+    // Only try the first `<svg` tag (the root): retrying from every later one
+    // would rescan the rest of the input each time (quadratic on bad input)
+    extractorRegExps.root.lastIndex = Math.max(svg.search(/<svg\s/), 0);
+    const root = extractorRegExps.root.exec(svg);
     if (root) {
       const attrs = parseAttributes(root[0]);
       if (attrs.width && attrs.height) {
