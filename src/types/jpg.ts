@@ -127,24 +127,15 @@ export const JPG: IImage = {
   validate: (input) => toHexString(input, 0, 2) === "ffd8",
 
   calculate(input) {
-    // Skip 4 chars, they are for signature
-    input = input.subarray(4);
+    // Skip the SOI marker (0xFFD8), it is the signature and has no length.
+    // The first block may be the SOF itself, so its marker must be read too
+    input = input.subarray(2);
 
     let orientation: number | undefined;
     let next: number;
     while (input.length > 0) {
-      // read length of the next block
-      const i = readUInt16BE(input, 0);
-
-      // ensure correct format
-      validateInput(input, i);
-
-      if (isEXIF(input)) {
-        orientation = validateExifBlock(input, i);
-      }
-
       // Every JPEG block must begin with a 0xFF
-      const marker = findMarker(input, i);
+      const marker = findMarker(input, 0);
 
       // 0xFFC0 is baseline standard(SOF)
       // 0xFFC1 is baseline optimized(SOF)
@@ -177,8 +168,19 @@ export const JPG: IImage = {
         break;
       }
 
-      // move to the next block
+      // read length of the block, which follows its marker
       input = input.subarray(marker + 2);
+      const i = readUInt16BE(input, 0);
+
+      // ensure correct format
+      validateInput(input, i);
+
+      if (isEXIF(input)) {
+        orientation = validateExifBlock(input, i);
+      }
+
+      // move to the next block
+      input = input.subarray(i);
     }
 
     throw new TypeError("Invalid JPG, no size found");
