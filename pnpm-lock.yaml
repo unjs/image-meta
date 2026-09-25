@@ -9,19 +9,19 @@ importers:
   .:
     devDependencies:
       '@types/node':
-        specifier: ^26
+        specifier: ^26.6.2
         version: 26.6.2
       '@vitest/coverage-v8':
-        specifier: ^5
+        specifier: ^5.0.1
         version: 5.0.1(vitest@5.0.1)
       changelogen:
         specifier: ^0.6.2
         version: 0.6.2(magicast@0.5.5)
       eslint:
-        specifier: ^10
+        specifier: ^10.11.0
         version: 10.11.0(jiti@2.7.0)
       eslint-config-unjs:
-        specifier: ^0.6
+        specifier: ^0.6.2
         version: 0.6.2(eslint@10.11.0(jiti@2.7.0))(typescript@6.0.3)
       jiti:
         specifier: ^2.7
@@ -30,10 +30,10 @@ importers:
         specifier: ^0.4.40
         version: 0.4.40(chokidar@5.0.0)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magicast@0.5.5)(typescript@6.0.3)
       prettier:
-        specifier: ^3
+        specifier: ^3.9.8
         version: 3.9.8
       typescript:
-        specifier: ^6
+        specifier: ^6.0.3
         version: 6.0.3
       vitest:
         specifier: ^5.0.1
