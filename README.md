@@ -37,7 +37,7 @@ type ImageMeta = {
   type?: string; // detected format, e.g. "png"
   width: number; // of the largest image when there are several
   height: number;
-  orientation?: number; // EXIF orientation (jpg)
+  orientation?: number; // EXIF orientation (jpg), or from irot/imir (heic, avif)
   images?: Omit<ImageMeta, "images">[]; // all embedded images (ico, cur, icns)
 };
 ```
