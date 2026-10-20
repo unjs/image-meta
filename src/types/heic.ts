@@ -68,6 +68,10 @@ function readProperties(input: Uint8Array, ipcoBox: Box): Property[] {
     properties.push({ type: readUInt32BE(input, offset + 4), offset, size });
     offset += size;
   }
+  // A leftover fragment too short for a box header is corrupt too, libheif rejects it
+  if (offset !== end) {
+    throw new TypeError("Invalid HEIF, corrupt ipco box");
+  }
   return properties;
 }
 
@@ -108,6 +112,8 @@ function readItemAssociations(
     return undefined;
   }
   const entryCount = readUInt32BE(input, offset - 4);
+  // Every entry is bounds-checked before a match is used
+  let indices: number[] | null = null;
   for (let entry = 0; entry < entryCount; entry++) {
     if (offset + idSize + 1 > end) {
       return undefined;
@@ -119,8 +125,8 @@ function readItemAssociations(
     if (offset + count * indexSize > end) {
       return undefined;
     }
-    if (id === itemId) {
-      const indices: number[] = [];
+    if (id === itemId && !indices) {
+      indices = [];
       for (let i = 0; i < count; i++, offset += indexSize) {
         // The top bit flags the association as essential
         indices.push(
@@ -129,12 +135,12 @@ function readItemAssociations(
             : input[offset] & 0x7f,
         );
       }
-      return indices;
+      continue;
     }
     offset += count * indexSize;
   }
-  // The item is not in this box, a later ipma box may list it
-  return null;
+  // null when the item is not in this box, a later ipma box may list it
+  return indices;
 }
 
 // Read the size and orientation of the primary item from its associated properties
@@ -164,6 +170,7 @@ function readPrimaryImageSize(
   }
 
   let image: Size | undefined;
+  const claps: Box[] = [];
   let transformed = false;
   let turns = 0;
   let mirrored = 0;
@@ -175,8 +182,8 @@ function readPrimaryImageSize(
     }
     if (box.type === ISPE) {
       image ??= readSpatialExtents(input, box);
-    } else if (box.type === CLAP && image) {
-      applyCleanAperture(input, box, image);
+    } else if (box.type === CLAP) {
+      claps.push(box);
     } else if (box.type === IROT && box.size >= 9) {
       transformed = true;
       turns = (turns + (input[box.offset + 8] & 3)) % 4;
@@ -188,7 +195,14 @@ function readPrimaryImageSize(
     }
   }
 
-  if (image && transformed) {
+  if (!image) {
+    return undefined;
+  }
+  // Crop even when clap is listed before ispe, as libheif does
+  for (const box of claps) {
+    applyCleanAperture(input, box, image);
+  }
+  if (transformed) {
     // Dimensions are reported as stored, like the EXIF orientation of JPEG files
     image.orientation = ORIENTATIONS[mirrored][turns];
   }
