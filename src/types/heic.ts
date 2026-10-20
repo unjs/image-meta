@@ -91,12 +91,13 @@ function readPrimaryItemId(input: Uint8Array, metaBox: Box) {
     : readUInt32BE(input, pitmBox.offset + 12);
 }
 
-// Read the 1-based ipco indices of the properties associated with an item (iprp > ipma)
+// Read the 1-based ipco indices of the properties associated with an item (iprp > ipma),
+// null when the box does not list the item and undefined when it is malformed
 function readItemAssociations(
   input: Uint8Array,
   ipmaBox: Box,
   itemId: number,
-): number[] | undefined {
+): number[] | null | undefined {
   const end = ipmaBox.offset + ipmaBox.size;
   const version = input[ipmaBox.offset + 8];
   const largeIndex = (input[ipmaBox.offset + 11] & 1) === 1;
@@ -132,7 +133,8 @@ function readItemAssociations(
     }
     offset += count * indexSize;
   }
-  return undefined;
+  // The item is not in this box, a later ipma box may list it
+  return null;
 }
 
 // Read the size and orientation of the primary item from its associated properties
@@ -143,10 +145,20 @@ function readPrimaryImageSize(
   properties: Property[],
 ): Size | undefined {
   const itemId = readPrimaryItemId(input, metaBox);
-  const ipmaBox =
-    itemId !== undefined &&
-    findBox(input, "ipma", iprpBox.offset + 8, iprpBox.offset + iprpBox.size);
-  const indices = ipmaBox && readItemAssociations(input, ipmaBox, itemId);
+  if (itemId === undefined) {
+    return undefined;
+  }
+
+  // There may be several ipma boxes, one per version and flags combination
+  const end = iprpBox.offset + iprpBox.size;
+  let indices: number[] | null | undefined = null;
+  for (
+    let ipmaBox = findBox(input, "ipma", iprpBox.offset + 8, end);
+    ipmaBox && indices === null;
+    ipmaBox = findBox(input, "ipma", ipmaBox.offset + ipmaBox.size, end)
+  ) {
+    indices = readItemAssociations(input, ipmaBox, itemId);
+  }
   if (!indices) {
     return undefined;
   }
