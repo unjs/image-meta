@@ -63,6 +63,43 @@ describe("image-meta", () => {
     expect(imageMeta(terminated)).toMatchObject({ width: 1, height: 2 });
   });
 
+  test("svg: long prolog is scanned in linear time", () => {
+    // Past the first kilo-byte, the prolog is walked to find the root
+    const size = 8 * 1024 * 1024;
+    const inputs = [
+      "<!--" + "a".repeat(size), // unterminated comment
+      "<!--".repeat(size / 4), // one unterminated comment
+      "<!---->".repeat(size / 7), // many comments
+      "<?" + "a".repeat(size), // unterminated processing instruction
+      "<?a?>".repeat(size / 5), // many processing instructions
+      "<!DOCTYPE svg [" + "'a'".repeat(size / 3), // unterminated doctype
+      "<!DOCTYPE svg [" + "<!--".repeat(size / 4),
+      "<!DOCTYPE svg [" + "'".repeat(size + 1), // many quotes, the last unterminated
+      "<!doctype html>" + "<svg ".repeat(size / 5), // unterminated root
+      " ".repeat(size),
+    ];
+    for (const text of inputs) {
+      const input = new TextEncoder().encode(text);
+      const start = performance.now();
+      expect(() => imageMeta(input)).toThrow(TypeError);
+      expect(performance.now() - start).toBeLessThan(1000);
+    }
+  });
+
+  test("svg: root after a multi-MB prolog is found", () => {
+    const input = new TextEncoder().encode(
+      `<?xml version="1.0"?><!-- ${"a".repeat(8 * 1024 * 1024)} -->` +
+        `<svg width="10" height="20"></svg>`,
+    );
+    const start = performance.now();
+    expect(imageMeta(input)).toMatchObject({
+      type: "svg",
+      width: 10,
+      height: 20,
+    });
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
   test("pnm: many comment lines are not consumed quadratically", () => {
     const input = new TextEncoder().encode(
       "P2\n" + "#\n".repeat(200_000) + "1 1\n255\n",
