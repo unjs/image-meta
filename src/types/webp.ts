@@ -5,7 +5,44 @@ import {
   toUTF8String,
   readInt16LE,
   readUInt24LE,
+  readUInt32BE,
+  readUInt32LE,
+  toTagCode,
 } from "./utils.ts";
+
+const ANMF = toTagCode("ANMF");
+const ANIMATION_FLAG = 0x02;
+
+// Count the animation frames (ANMF chunks) by walking the RIFF chunks, without reading their data
+function countFrames(input: Uint8Array): number | undefined {
+  const end = 8 + readUInt32LE(input, 4);
+  if (!(end <= input.length)) {
+    return undefined;
+  }
+  let frames = 0;
+  let offset = 12;
+  while (offset + 8 <= end) {
+    if (readUInt32BE(input, offset) === ANMF) {
+      frames++;
+    }
+    // Chunk data is padded to an even size
+    const size = readUInt32LE(input, offset + 4);
+    offset += 8 + size + (size % 2);
+  }
+  return offset === end ? frames : undefined;
+}
+
+// Extended files flag animation in the VP8X header, other variants hold a single image
+function readAnimation(input: Uint8Array): Pick<ISize, "animated" | "pages"> {
+  if (toUTF8String(input, 12, 16) !== "VP8X") {
+    return { animated: false, pages: 1 };
+  }
+  if (input[20] & ANIMATION_FLAG) {
+    const pages = countFrames(input);
+    return pages === undefined ? { animated: true } : { animated: true, pages };
+  }
+  return { animated: false, pages: 1 };
+}
 
 function calculateExtended(input: Uint8Array): ISize {
   return {
@@ -32,6 +69,42 @@ function calculateLossy(input: Uint8Array): ISize {
   };
 }
 
+function calculateSize(input: Uint8Array): ISize {
+  // Every variant reads its size from the first 10 bytes of chunk data
+  if (input.length < 30) {
+    throw new TypeError("Invalid WebP, truncated input");
+  }
+
+  const chunkHeader = toUTF8String(input, 12, 16);
+  input = input.slice(20, 30);
+
+  // Extended webp stream signature
+  if (chunkHeader === "VP8X") {
+    const extendedHeader = input[0];
+    const validStart = (extendedHeader & 0xc0) === 0;
+    const validEnd = (extendedHeader & 0x01) === 0;
+    if (validStart && validEnd) {
+      return calculateExtended(input);
+    } else {
+      // TODO: breaking change
+      throw new TypeError("Invalid WebP");
+    }
+  }
+
+  // Lossless webp stream signature
+  if (chunkHeader === "VP8 " && input[0] !== 0x2f) {
+    return calculateLossy(input);
+  }
+
+  // Lossy webp stream signature
+  const signature = toHexString(input, 3, 6);
+  if (chunkHeader === "VP8L" && signature !== "9d012a") {
+    return calculateLossless(input);
+  }
+
+  throw new TypeError("Invalid WebP");
+}
+
 export const WEBP: IImage = {
   validate(input) {
     const riffHeader = toUTF8String(input, 0, 4) === "RIFF";
@@ -41,38 +114,6 @@ export const WEBP: IImage = {
   },
 
   calculate(input) {
-    // Every variant reads its size from the first 10 bytes of chunk data
-    if (input.length < 30) {
-      throw new TypeError("Invalid WebP, truncated input");
-    }
-
-    const chunkHeader = toUTF8String(input, 12, 16);
-    input = input.slice(20, 30);
-
-    // Extended webp stream signature
-    if (chunkHeader === "VP8X") {
-      const extendedHeader = input[0];
-      const validStart = (extendedHeader & 0xc0) === 0;
-      const validEnd = (extendedHeader & 0x01) === 0;
-      if (validStart && validEnd) {
-        return calculateExtended(input);
-      } else {
-        // TODO: breaking change
-        throw new TypeError("Invalid WebP");
-      }
-    }
-
-    // Lossless webp stream signature
-    if (chunkHeader === "VP8 " && input[0] !== 0x2f) {
-      return calculateLossy(input);
-    }
-
-    // Lossy webp stream signature
-    const signature = toHexString(input, 3, 6);
-    if (chunkHeader === "VP8L" && signature !== "9d012a") {
-      return calculateLossless(input);
-    }
-
-    throw new TypeError("Invalid WebP");
+    return { ...calculateSize(input), ...readAnimation(input) };
   },
 };
