@@ -39,8 +39,26 @@ type ImageMeta = {
   height: number;
   orientation?: number; // EXIF orientation (jpg)
   images?: Omit<ImageMeta, "images">[]; // all embedded images (ico, cur, icns)
+  animated?: boolean; // animation or image sequence (gif, png, webp, avif, heic, jxl)
+  pages?: number; // number of frames or pages (gif, png, webp, tiff)
 };
 ```
+
+### Animation and pages
+
+`animated` and `pages` are read from the headers without decoding the image, and are left `undefined` when they can't be found cheaply (for example in a truncated file). A single frame is not reported as animated. For tiff, every directory counts as a page, including thumbnails and reduced-resolution images (e.g. in camera raw files).
+
+| Format      | `animated`                                          | `pages`                 |
+| ----------- | --------------------------------------------------- | ----------------------- |
+| gif         | more than one frame                                 | number of frames        |
+| png (APNG)  | `acTL` chunk before `IDAT`                          | `acTL` frame count      |
+| webp        | `VP8X` animation flag                               | number of `ANMF` chunks |
+| avif / heic | sequence brand (`avis`, `msf1`, …) and a `moov` box | -                       |
+| jxl         | `have_animation` in the image metadata              | -                       |
+| tiff        | -                                                   | length of the IFD chain |
+
+> [!WARNING]
+> These values are **best-effort hints**, useful for UX and processing decisions (keeping an animation when converting, skipping a step for single-frame images, showing a frame count). They are **not** reliable for security decisions such as size or resource limits: image-meta parses headers on its own, so for malformed or crafted files its answer can differ from what a decoder will do. Ask the decoder that will process the file when you need a guarantee.
 
 ### Error handling
 

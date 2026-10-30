@@ -1,5 +1,7 @@
 {
+  "animated": false,
   "height": 456,
+  "pages": 1,
   "type": "gif",
   "width": 123,
 }

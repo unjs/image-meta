@@ -35,8 +35,9 @@ const RATIOS = [
   [2, 1],
 ];
 
-function calculateCodestream(input: Uint8Array): ISize {
-  const readBits = createBitReader(input);
+type BitReader = ReturnType<typeof createBitReader>;
+
+function readSizeHeader(readBits: BitReader): ISize {
   const readSize = (isSmall: boolean) =>
     isSmall
       ? 8 * (1 + readBits(5))
@@ -52,7 +53,40 @@ function calculateCodestream(input: Uint8Array): ISize {
   return { height, width: Math.floor((height * numerator) / denominator) };
 }
 
-// The size header is at most 11 bytes into the codestream
+// Read have_animation from the image metadata that follows the size header, skipping the
+// orientation, intrinsic size and preview size fields before it
+function readAnimated(readBits: BitReader): boolean {
+  // all_default, then extra_fields: without extra fields there is no animation
+  if (readBits(1) === 1 || readBits(1) === 0) {
+    return false;
+  }
+  readBits(3); // orientation
+  if (readBits(1) === 1) {
+    readSizeHeader(readBits); // intrinsic size
+  }
+  if (readBits(1) === 1) {
+    // Preview size, in multiples of 8 or not, as a U32 with a 2-bit selector
+    const bits = readBits(1) === 1 ? [0, 0, 5, 9] : [6, 8, 10, 12];
+    readBits(bits[readBits(2)]);
+    if (readBits(3) === 0) {
+      readBits(bits[readBits(2)]);
+    }
+  }
+  return readBits(1) === 1;
+}
+
+function calculateCodestream(input: Uint8Array): ISize {
+  const readBits = createBitReader(input);
+  const size = readSizeHeader(readBits);
+  try {
+    return { ...size, animated: readAnimated(readBits) };
+  } catch {
+    // Truncated after the size header
+    return size;
+  }
+}
+
+// The size header and the image metadata up to have_animation fit in 32 bytes
 const CODESTREAM_PREFIX_BYTES = 32;
 
 const JXLC = toTagCode("jxlc");

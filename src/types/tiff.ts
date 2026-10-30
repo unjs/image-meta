@@ -13,6 +13,9 @@ const TYPE_LONG8 = 16;
 // libtiff rejects directories with more entries than this
 const MAX_ENTRIES = 4096;
 
+// Stop following the IFD chain after this many directories
+const MAX_PAGES = 65_536;
+
 // Read a 64-bit unsigned integer (imprecise above Number.MAX_SAFE_INTEGER)
 function readUInt64(input: Uint8Array, offset: number, isBigEndian: boolean) {
   const high = readUInt(input, 32, offset + (isBigEndian ? 0 : 4), isBigEndian);
@@ -49,6 +52,35 @@ function readValue(
   }
 }
 
+// Count the IFDs by following the chain of next-IFD offsets, without reading their entries.
+// The count is unknown when the chain is truncated, loops, or is too long
+function countPages(
+  input: Uint8Array,
+  ifdOffset: number,
+  isBigEndian: boolean,
+  isBigTiff: boolean,
+): number | undefined {
+  const seen = new Set<number>();
+  let offset = ifdOffset;
+  while (offset !== 0) {
+    if (seen.has(offset) || seen.size >= MAX_PAGES) {
+      return undefined;
+    }
+    seen.add(offset);
+    // Entry count, entries, then the offset of the next IFD
+    const nextOffset = isBigTiff
+      ? offset + 8 + readUInt64(input, offset, isBigEndian) * 20
+      : offset + 2 + readUInt(input, 16, offset, isBigEndian) * 12;
+    if (!(nextOffset + (isBigTiff ? 8 : 4) <= input.length)) {
+      return undefined;
+    }
+    offset = isBigTiff
+      ? readUInt64(input, nextOffset, isBigEndian)
+      : readUInt(input, 32, nextOffset, isBigEndian);
+  }
+  return seen.size;
+}
+
 const signatures = new Set([
   "49492a00", // Little endian
   "4d4d002a", // Big Endian
@@ -64,6 +96,7 @@ export const TIFF: IImage = {
     const isBigTiff = readUInt(input, 16, 2, isBigEndian) === 43;
 
     // Locate the first IFD (image-file-directory) and its entry layout
+    let ifdOffset: number;
     let entryCount: number;
     let entriesOffset: number;
     let entrySize: number;
@@ -74,7 +107,7 @@ export const TIFF: IImage = {
       if (byteSize !== 8 || reserved !== 0) {
         throw new TypeError("Invalid BigTIFF header");
       }
-      const ifdOffset = readUInt64(input, 8, isBigEndian);
+      ifdOffset = readUInt64(input, 8, isBigEndian);
       if (!(ifdOffset + 8 <= input.length)) {
         throw new TypeError("Invalid Tiff. IFD offset out of bounds");
       }
@@ -82,7 +115,7 @@ export const TIFF: IImage = {
       entriesOffset = ifdOffset + 8;
       entrySize = 20;
     } else {
-      const ifdOffset = readUInt(input, 32, 4, isBigEndian);
+      ifdOffset = readUInt(input, 32, 4, isBigEndian);
       if (!(ifdOffset + 2 <= input.length)) {
         throw new TypeError("Invalid Tiff. IFD offset out of bounds");
       }
@@ -125,6 +158,7 @@ export const TIFF: IImage = {
       throw new TypeError("Invalid Tiff. Missing tags");
     }
 
-    return { height, width };
+    const pages = countPages(input, ifdOffset, isBigEndian, isBigTiff);
+    return pages === undefined ? { height, width } : { height, width, pages };
   },
 };
