@@ -29,7 +29,10 @@ function countFrames(input: Uint8Array): number | undefined {
     const size = readUInt32LE(input, offset + 4);
     offset += 8 + size + (size % 2);
   }
-  return offset === end ? frames : undefined;
+  // Some writers leave the padding of an odd-sized last chunk out of the RIFF size
+  return frames > 0 && (offset === end || offset === end + 1)
+    ? frames
+    : undefined;
 }
 
 // Extended files flag animation in the VP8X header, other variants hold a single image
@@ -38,8 +41,11 @@ function readAnimation(input: Uint8Array): Pick<ISize, "animated" | "pages"> {
     return { animated: false, pages: 1 };
   }
   if (input[20] & ANIMATION_FLAG) {
+    // Like gif and png, a single frame is not an animation
     const pages = countFrames(input);
-    return pages === undefined ? { animated: true } : { animated: true, pages };
+    return pages === undefined
+      ? { animated: true }
+      : { animated: pages > 1, pages };
   }
   return { animated: false, pages: 1 };
 }

@@ -16,8 +16,11 @@ function readAnimation(input: Uint8Array): Pick<ISize, "animated" | "pages"> {
   while (offset + 12 <= input.length) {
     const type = readUInt32BE(input, offset + 4);
     if (type === ACTL) {
+      // PNG limits 4-byte integers to 2^31 - 1
       const frames = readUInt32BE(input, offset + 8);
-      return frames > 0 ? { animated: frames > 1, pages: frames } : {};
+      return frames > 0 && frames < 2 ** 31
+        ? { animated: frames > 1, pages: frames }
+        : {};
     }
     if (type === IDAT) {
       return { animated: false, pages: 1 };

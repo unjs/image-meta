@@ -46,7 +46,7 @@ type ImageMeta = {
 
 ### Animation and pages
 
-`animated` and `pages` are read from the headers without decoding the image, and are left `undefined` when they can't be found cheaply (for example in a truncated file).
+`animated` and `pages` are read from the headers without decoding the image, and are left `undefined` when they can't be found cheaply (for example in a truncated file). A single frame is not reported as animated. For tiff, every directory counts as a page, including thumbnails and reduced-resolution images (e.g. in camera raw files).
 
 | Format      | `animated`                                          | `pages`                 |
 | ----------- | --------------------------------------------------- | ----------------------- |

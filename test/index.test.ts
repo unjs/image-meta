@@ -165,6 +165,68 @@ describe("image-meta", () => {
       expect(performance.now() - start).toBeLessThan(1000);
     });
 
+    test("gif: local color tables are skipped", () => {
+      // Two 1x1 frames, the first with a 2-color local color table
+      const frame = (flags: number, table: number[]) => [
+        0x2c,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        flags,
+        ...table,
+        2,
+        2,
+        0x44,
+        0x01,
+        0,
+      ];
+      const input = new Uint8Array([
+        ...new TextEncoder().encode("GIF89a"),
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        ...frame(0x80, [0, 0, 0, 255, 255, 255]),
+        ...frame(0, []),
+        0x3b,
+      ]);
+      expect(imageMeta(input)).toMatchObject({ animated: true, pages: 2 });
+    });
+
+    test("png: acTL after IDAT is ignored", async () => {
+      // Insert an acTL chunk (CRC is not checked) before IEND
+      const input = await fixture("png/sample.png");
+      const actl = [0, 0, 0, 8, ...new TextEncoder().encode("acTL")];
+      const meta = imageMeta(
+        new Uint8Array([
+          ...input.subarray(0, -12),
+          ...actl,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          ...input.subarray(-12),
+        ]),
+      );
+      expect(meta).toMatchObject({ animated: false, pages: 1 });
+    });
+
     test("png: truncated before IDAT is unknown", async () => {
       const input = await fixture("png/sample.png");
       const meta = imageMeta(input.subarray(0, 40));
@@ -177,6 +239,22 @@ describe("image-meta", () => {
       const meta = imageMeta(input.subarray(0, -10));
       expect(meta.animated).toBe(true);
       expect(meta.pages).toBeUndefined();
+    });
+
+    test("webp: animation flag without frames has unknown pages", async () => {
+      const input = new Uint8Array(await fixture("webp/extended.webp"));
+      input[20] |= 0x02;
+      const meta = imageMeta(input);
+      expect(meta.animated).toBe(true);
+      expect(meta.pages).toBeUndefined();
+    });
+
+    test("webp: single-frame animation is not animated", async () => {
+      // Drop the last ANMF chunk (header, frame header, VP8L chunk) and fix the RIFF size
+      const input = await fixture("webp/animated.webp");
+      const single = new Uint8Array(input.subarray(0, -(8 + 16 + 8 + 14)));
+      new DataView(single.buffer).setUint32(4, single.length - 8, true);
+      expect(imageMeta(single)).toMatchObject({ animated: false, pages: 1 });
     });
 
     test("avif: sequence brand with a movie box is animated", async () => {
