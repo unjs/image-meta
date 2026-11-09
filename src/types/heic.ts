@@ -314,13 +314,9 @@ function isAnimated(input: Uint8Array): boolean | undefined {
 export const HEIC: IImage = {
   validate: (input) => detectHeifType(input) === "heic",
 
-<<<<<<< HEAD
-  calculate: (input) => readImageSize(input),
-=======
   calculate: (input) => {
-    const size = readLargestImageSize(input);
+    const size = readImageSize(input);
     const animated = isAnimated(input);
     return animated === undefined ? size : { ...size, animated };
   },
->>>>>>> upstream/main
 };
