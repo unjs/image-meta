@@ -63,6 +63,43 @@ describe("image-meta", () => {
     expect(imageMeta(terminated)).toMatchObject({ width: 1, height: 2 });
   });
 
+  test("svg: long prolog is scanned in linear time", () => {
+    // Past the first kilo-byte, the prolog is walked to find the root
+    const size = 8 * 1024 * 1024;
+    const inputs = [
+      "<!--" + "a".repeat(size), // unterminated comment
+      "<!--".repeat(size / 4), // one unterminated comment
+      "<!---->".repeat(size / 7), // many comments
+      "<?" + "a".repeat(size), // unterminated processing instruction
+      "<?a?>".repeat(size / 5), // many processing instructions
+      "<!DOCTYPE svg [" + "'a'".repeat(size / 3), // unterminated doctype
+      "<!DOCTYPE svg [" + "<!--".repeat(size / 4),
+      "<!DOCTYPE svg [" + "'".repeat(size + 1), // many quotes, the last unterminated
+      "<!doctype html>" + "<svg ".repeat(size / 5), // unterminated root
+      " ".repeat(size),
+    ];
+    for (const text of inputs) {
+      const input = new TextEncoder().encode(text);
+      const start = performance.now();
+      expect(() => imageMeta(input)).toThrow(TypeError);
+      expect(performance.now() - start).toBeLessThan(1000);
+    }
+  });
+
+  test("svg: root after a multi-MB prolog is found", () => {
+    const input = new TextEncoder().encode(
+      `<?xml version="1.0"?><!-- ${"a".repeat(8 * 1024 * 1024)} -->` +
+        `<svg width="10" height="20"></svg>`,
+    );
+    const start = performance.now();
+    expect(imageMeta(input)).toMatchObject({
+      type: "svg",
+      width: 10,
+      height: 20,
+    });
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
   test("pnm: many comment lines are not consumed quadratically", () => {
     const input = new TextEncoder().encode(
       "P2\n" + "#\n".repeat(200_000) + "1 1\n255\n",
@@ -132,5 +169,215 @@ describe("image-meta", () => {
     const meta = imageMeta(input);
     expect(meta).toMatchObject({ width: 256, height: 256 });
     expect(meta.images).toHaveLength(2);
+  });
+
+  describe("animated and pages", () => {
+    const fixture = (path: string) =>
+      readFile(resolve(fixtureDir, "valid", path));
+
+    test("gif: truncated after two frames is animated, with unknown pages", async () => {
+      const input = await fixture("gif/animated.gif");
+      // Cut in the middle of the third frame
+      const meta = imageMeta(input.subarray(0, -6));
+      expect(meta.animated).toBe(true);
+      expect(meta.pages).toBeUndefined();
+    });
+
+    test("gif: truncated after one frame is unknown", async () => {
+      const input = await fixture("gif/sample.gif");
+      const meta = imageMeta(input.subarray(0, -1));
+      expect(meta.animated).toBeUndefined();
+      expect(meta.pages).toBeUndefined();
+    });
+
+    test("gif: many tiny data sub-blocks are walked quickly", () => {
+      // Header without a color table, then one image whose data is 1-byte sub-blocks
+      const input = new Uint8Array(16 * 1024 * 1024).fill(1);
+      input.set(new TextEncoder().encode("GIF89a"));
+      input.set([1, 0, 1, 0, 0, 0, 0], 6);
+      input.set([0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2], 13);
+      input.set([0, 0x3b], input.length - 2);
+      const start = performance.now();
+      expect(imageMeta(input)).toMatchObject({ animated: false, pages: 1 });
+      expect(performance.now() - start).toBeLessThan(1000);
+    });
+
+    test("gif: local color tables are skipped", () => {
+      // Two 1x1 frames, the first with a 2-color local color table
+      const frame = (flags: number, table: number[]) => [
+        0x2c,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        flags,
+        ...table,
+        2,
+        2,
+        0x44,
+        0x01,
+        0,
+      ];
+      const input = new Uint8Array([
+        ...new TextEncoder().encode("GIF89a"),
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        ...frame(0x80, [0, 0, 0, 255, 255, 255]),
+        ...frame(0, []),
+        0x3b,
+      ]);
+      expect(imageMeta(input)).toMatchObject({ animated: true, pages: 2 });
+    });
+
+    test("png: acTL after IDAT is ignored", async () => {
+      // Insert an acTL chunk (CRC is not checked) before IEND
+      const input = await fixture("png/sample.png");
+      const actl = [0, 0, 0, 8, ...new TextEncoder().encode("acTL")];
+      const meta = imageMeta(
+        new Uint8Array([
+          ...input.subarray(0, -12),
+          ...actl,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          ...input.subarray(-12),
+        ]),
+      );
+      expect(meta).toMatchObject({ animated: false, pages: 1 });
+    });
+
+    test("png: truncated before IDAT is unknown", async () => {
+      const input = await fixture("png/sample.png");
+      const meta = imageMeta(input.subarray(0, 40));
+      expect(meta.animated).toBeUndefined();
+      expect(meta.pages).toBeUndefined();
+    });
+
+    test("webp: truncated animation is animated, with unknown pages", async () => {
+      const input = await fixture("webp/animated.webp");
+      const meta = imageMeta(input.subarray(0, -10));
+      expect(meta.animated).toBe(true);
+      expect(meta.pages).toBeUndefined();
+    });
+
+    test("webp: animation flag without frames has unknown pages", async () => {
+      const input = new Uint8Array(await fixture("webp/extended.webp"));
+      input[20] |= 0x02;
+      const meta = imageMeta(input);
+      expect(meta.animated).toBe(true);
+      expect(meta.pages).toBeUndefined();
+    });
+
+    test("webp: single-frame animation is not animated", async () => {
+      // Drop the last ANMF chunk (header, frame header, VP8L chunk) and fix the RIFF size
+      const input = await fixture("webp/animated.webp");
+      const single = new Uint8Array(input.subarray(0, -(8 + 16 + 8 + 14)));
+      new DataView(single.buffer).setUint32(4, single.length - 8, true);
+      expect(imageMeta(single)).toMatchObject({ animated: false, pages: 1 });
+    });
+
+    test("avif: sequence brand with a movie box is animated", async () => {
+      // Brands of an image sequence (avis, msf1) on a still image, plus an empty moov box
+      const input = await fixture("avif/sample-major-avis.avif");
+      const moov = new Uint8Array([0, 0, 0, 8, 0x6d, 0x6f, 0x6f, 0x76]);
+      const meta = imageMeta(new Uint8Array([...input, ...moov]));
+      expect(meta.animated).toBe(true);
+    });
+
+    test("jxl: have_animation is read after a preview header", () => {
+      const bits: number[] = [];
+      const write = (value: number, length: number) => {
+        for (let i = 0; i < length; i++) bits.push((value >> i) & 1);
+      };
+      write(1, 1); // small size
+      write(0, 5); // height 8
+      write(1, 3); // 1:1 ratio
+      write(0, 1); // not all_default
+      write(1, 1); // extra_fields
+      write(0, 3); // orientation
+      write(0, 1); // no intrinsic size
+      write(1, 1); // have_preview
+      write(1, 1); // div8
+      write(2, 2); // ysize selector: 5 bits
+      write(3, 5);
+      write(0, 3); // explicit xsize
+      write(3, 2); // xsize selector: 9 bits
+      write(7, 9);
+      write(1, 1); // have_animation
+      const input = new Uint8Array(2 + Math.ceil(bits.length / 8) + 8);
+      input.set([0xff, 0x0a]);
+      for (const [index, bit] of bits.entries()) {
+        input[2 + (index >> 3)] |= bit << (index & 7);
+      }
+      expect(imageMeta(input)).toMatchObject({
+        width: 8,
+        height: 8,
+        animated: true,
+      });
+
+      // Truncated after the size header: unknown
+      const meta = imageMeta(input.subarray(0, 4));
+      expect(meta).toMatchObject({ width: 8, height: 8 });
+      expect(meta.animated).toBeUndefined();
+    });
+
+    test("tiff: IFD cycle leaves pages unknown", async () => {
+      const input = new Uint8Array(await fixture("tiff/multipage.tiff"));
+      // Point the last IFD (8 entries) back at the first one
+      const view = new DataView(input.buffer);
+      let offset = 8;
+      for (let page = 0; page < 2; page++) {
+        offset = view.getUint32(offset + 2 + 8 * 12, true);
+      }
+      view.setUint32(offset + 2 + 8 * 12, 8, true);
+      const meta = imageMeta(input);
+      expect(meta).toMatchObject({ width: 1, height: 1 });
+      expect(meta.pages).toBeUndefined();
+    });
+
+    test("tiff: long IFD chain is capped quickly", async () => {
+      // A valid first IFD, followed by a chain of empty IFDs (count 0, next offset)
+      const first = await fixture("tiff/little-endian.tiff");
+      const firstIfd = new DataView(first.buffer, first.byteOffset).getUint32(
+        4,
+        true,
+      );
+      const entries = new DataView(first.buffer, first.byteOffset).getUint16(
+        firstIfd,
+        true,
+      );
+      const nextPosition = firstIfd + 2 + entries * 12;
+      const input = new Uint8Array(first.length + 6 * 200_000);
+      input.set(first);
+      const view = new DataView(input.buffer);
+      view.setUint32(nextPosition, first.length, true);
+      for (let offset = first.length; offset < input.length; offset += 6) {
+        const next = offset + 6 < input.length ? offset + 6 : 0;
+        view.setUint32(offset + 2, next, true);
+      }
+      const start = performance.now();
+      const meta = imageMeta(input);
+      expect(performance.now() - start).toBeLessThan(1000);
+      expect(meta).toMatchObject({ width: 123, height: 456 });
+      expect(meta.pages).toBeUndefined();
+    });
   });
 });

@@ -60,25 +60,20 @@ function skipComment(input: Uint8Array, offset: number) {
   return input.length;
 }
 
-// The root tag, as `svgReg` matches it at the first `<svg` followed by whitespace once comments
-// are removed. The bytes are scanned in one pass, as the regex overflows the stack on a multi-MB
-// tag, and only the root tag is decoded. All markers are ASCII, which UTF-8 never uses within a
-// multi-byte character
-function extractRoot(input: Uint8Array): string | undefined {
+// Offset of the first `<svg` followed by whitespace once comments are removed, as `svgReg`
+// matches it, or -1. All markers are ASCII, which UTF-8 never uses within a multi-byte character
+function findSvgTag(input: Uint8Array) {
   const length = input.length;
   let start = 0;
-  let offset = 0;
   let matched = 0; // bytes of `<svg` matched so far
-
-  // The tag starts at the first `<svg` followed by whitespace
-  while (offset < length) {
+  for (let offset = 0; offset < length; offset++) {
     const byte = input[offset];
     if (byte === TAG_START && isCommentAt(input, offset)) {
-      offset = skipComment(input, offset);
+      offset = skipComment(input, offset) - 1;
       continue;
     }
     if (matched === SVG_TAG.length && isSpaceAt(input, offset)) {
-      break;
+      return start;
     }
     if (byte === TAG_START) {
       start = offset;
@@ -88,12 +83,116 @@ function extractRoot(input: Uint8Array): string | undefined {
     } else {
       matched = 0;
     }
+  }
+  return -1;
+}
+
+const isXMLSpace = (byte: number) =>
+  byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d;
+
+// Offset after the first `?>` from `offset`, or the end of the input
+function skipProcessingInstruction(input: Uint8Array, offset: number) {
+  for (let end = offset; end + 1 < input.length; end++) {
+    if (input[end] === 0x3f && input[end + 1] === TAG_END) {
+      return end + 2;
+    }
+  }
+  return input.length;
+}
+
+const DOCTYPE = [0x44, 0x4f, 0x43, 0x54, 0x59, 0x50, 0x45]; // DOCTYPE
+
+// Whether `<!DOCTYPE` (case-insensitive) is at `offset`
+function isDoctypeAt(input: Uint8Array, offset: number) {
+  if (input[offset + 1] !== 0x21) {
+    return false;
+  }
+  for (const [index, byte] of DOCTYPE.entries()) {
+    // Clearing the lower-case bit only maps lower-case ASCII letters onto these upper-case ones
+    if ((input[offset + 2 + index] & 0xdf) !== byte) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Offset after the `<!DOCTYPE` declaration whose body starts at `offset`, or the end of the
+// input. It ends at the first `>` outside of quotes, comments, processing instructions and its
+// internal subset (`[ … ]`), whose declarations may hold any of these
+function skipDoctype(input: Uint8Array, offset: number) {
+  const length = input.length;
+  let subset = false;
+  while (offset < length) {
+    const byte = input[offset];
+    if (byte === DOUBLE_QUOTE || byte === SINGLE_QUOTE) {
+      const end = input.indexOf(byte, offset + 1);
+      if (end === -1) {
+        return length;
+      }
+      offset = end + 1;
+      continue;
+    }
+    if (byte === TAG_START) {
+      if (isCommentAt(input, offset)) {
+        offset = skipComment(input, offset);
+        continue;
+      }
+      if (input[offset + 1] === 0x3f) {
+        offset = skipProcessingInstruction(input, offset + 2);
+        continue;
+      }
+    }
+    if (byte === 0x5b) {
+      subset = true; // [
+    } else if (byte === 0x5d) {
+      subset = false; // ]
+    } else if (byte === TAG_END && !subset) {
+      return offset + 1;
+    }
     offset++;
   }
+  return length;
+}
 
-  // The tag ends at the first `>` outside of a quoted attribute value
+// Offset of the root `<svg` when it is the first element after the XML prolog (byte order mark,
+// whitespace, processing instructions such as `<?xml … ?>`, comments and a doctype), or -1.
+// Anything else ends the scan, so other input is rejected after a few bytes
+function findPrologRoot(input: Uint8Array) {
+  const length = input.length;
+  let offset =
+    input[0] === 0xef && input[1] === 0xbb && input[2] === 0xbf ? 3 : 0;
+  while (offset < length) {
+    const byte = input[offset];
+    if (isXMLSpace(byte)) {
+      offset++;
+      continue;
+    }
+    if (byte !== TAG_START) {
+      return -1;
+    }
+    if (input[offset + 1] === 0x3f) {
+      offset = skipProcessingInstruction(input, offset + 2);
+    } else if (isCommentAt(input, offset)) {
+      offset = skipComment(input, offset);
+    } else if (isDoctypeAt(input, offset)) {
+      offset = skipDoctype(input, offset + 2 + DOCTYPE.length);
+    } else {
+      const isRoot =
+        input[offset + 1] === SVG_TAG[1] &&
+        input[offset + 2] === SVG_TAG[2] &&
+        input[offset + 3] === SVG_TAG[3] &&
+        isSpaceAt(input, offset + 4);
+      return isRoot ? offset : -1;
+    }
+  }
+  return -1;
+}
+
+// Offset of the `>` ending the tag at `start`, as `svgReg` matches it: the first `>` outside of
+// a quoted attribute value or a comment, or -1
+function findTagEnd(input: Uint8Array, start: number) {
   let quote = 0;
-  for (offset++; offset < length; offset++) {
+  for (let offset = start + SVG_TAG.length; offset < input.length; offset++) {
     const byte = input[offset];
     if (byte === TAG_START && isCommentAt(input, offset)) {
       offset = skipComment(input, offset) - 1;
@@ -106,15 +205,25 @@ function extractRoot(input: Uint8Array): string | undefined {
     } else if (byte === DOUBLE_QUOTE || byte === SINGLE_QUOTE) {
       quote = byte;
     } else if (byte === TAG_END) {
-      break;
+      return offset;
     }
   }
-  if (offset >= length) {
+  return -1;
+}
+
+// The root tag starting at `start`, without comments. The bytes are scanned in one pass, as
+// `svgReg` overflows the stack on a multi-MB tag, and only the root tag is decoded
+function extractRoot(input: Uint8Array, start: number): string | undefined {
+  if (start === -1) {
+    return undefined;
+  }
+  const end = findTagEnd(input, start);
+  if (end === -1) {
     return undefined;
   }
   // Decoding only fails for a tag too long for a string
   try {
-    return toUTF8String(input, start, offset + 1).replace(commentReg, "");
+    return toUTF8String(input, start, end + 1).replace(commentReg, "");
   } catch {
     return undefined;
   }
@@ -203,13 +312,27 @@ function calculateByViewbox(attrs: IAttributes, viewbox: IAttributes): ISize {
 }
 
 export const SVG: IImage = {
-  // Scan only the first kilo-byte to speed up the check on larger files
-  validate: (input) => svgReg.test(toUTF8String(input, 0, 1000)),
+  validate(input) {
+    // Any `<svg` tag in the first kilo-byte, as before. Otherwise, as the prolog (e.g. comments
+    // or a doctype) or the root tag itself may be longer, a root that is the first element.
+    // Only the prolog and the root tag are scanned, not the whole input with a regex
+    if (svgReg.test(toUTF8String(input, 0, 1000))) {
+      return true;
+    }
+    const start = findPrologRoot(input);
+    return start !== -1 && findTagEnd(input, start) !== -1;
+  },
 
   calculate(input) {
-    // Only the first `<svg` tag (the root) is tried: retrying from every later one
-    // would rescan the rest of the input each time (quadratic on bad input)
-    const root = extractRoot(input);
+    // The root is the first element after the prolog, which is skipped as a whole, so an
+    // `<svg` in a doctype or processing instruction is not mistaken for it. Otherwise, it is
+    // the first `<svg` tag outside comments. Only this one tag is tried: retrying from every
+    // later one would rescan the rest of the input each time (quadratic on bad input)
+    const prologRoot = findPrologRoot(input);
+    const root = extractRoot(
+      input,
+      prologRoot === -1 ? findSvgTag(input) : prologRoot,
+    );
     if (root) {
       const attrs = parseAttributes(root);
       if (attrs.width && attrs.height) {

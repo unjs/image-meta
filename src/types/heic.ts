@@ -24,6 +24,11 @@ const ORIENTATIONS = [
   [2, 5, 4, 7],
 ];
 
+// Image sequence brands (AVIF, generic HEIF, HEVC), compared as 32-bit codes
+const SEQUENCE_BRANDS = new Set(
+  ["avis", "msf1", "hevc", "hevx"].map((brand) => toTagCode(brand)),
+);
+
 // Pick dimensions with largest area (width * height), keeping the earlier image on a tie
 function larger(largest: Size | undefined, image: Size): Size {
   return !largest || image.width * image.height > largest.width * largest.height
@@ -288,8 +293,34 @@ export function detectHeifType(input: Uint8Array): "avif" | "heic" | undefined {
     : undefined;
 }
 
+// An image sequence has a sequence brand in the file type box, and stores its frames as a
+// track in the movie box (moov). Without it, the brands alone may be wrong, so it is unknown
+function isAnimated(input: Uint8Array): boolean | undefined {
+  const ftypSize = readUInt32BE(input, 0);
+  let isSequence = false;
+  // Major brand, then compatible brands after the minor version
+  for (let offset = 8; offset + 4 <= ftypSize; offset += offset === 8 ? 8 : 4) {
+    if (SEQUENCE_BRANDS.has(readUInt32BE(input, offset))) {
+      isSequence = true;
+      break;
+    }
+  }
+  if (!isSequence) {
+    return false;
+  }
+  return findBox(input, "moov") ? true : undefined;
+}
+
 export const HEIC: IImage = {
   validate: (input) => detectHeifType(input) === "heic",
 
+<<<<<<< HEAD
   calculate: (input) => readImageSize(input),
+=======
+  calculate: (input) => {
+    const size = readLargestImageSize(input);
+    const animated = isAnimated(input);
+    return animated === undefined ? size : { ...size, animated };
+  },
+>>>>>>> upstream/main
 };

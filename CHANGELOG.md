@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.3.1
+
+[compare changes](https://github.com/unjs/image-meta/compare/v0.3.0...v0.3.1)
+
+### 🚀 Enhancements
+
+- Detect animated images and page/frame count ([#90](https://github.com/unjs/image-meta/pull/90))
+
+### 🩹 Fixes
+
+- **svg:** Detect SVGs whose prolog or root tag ends past the first kilo-byte ([#92](https://github.com/unjs/image-meta/pull/92))
+
+### ❤️ Contributors
+
+- Pi0x <x@pi0.io>
+
 ## v0.3.0
 
 [compare changes](https://github.com/unjs/image-meta/compare/v0.2.2...v0.3.0)

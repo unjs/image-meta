@@ -5,6 +5,11 @@ export type ImageMeta = {
   height: number;
   orientation?: number;
   type?: string;
+
+  // Best-effort hints read from the headers, left undefined when not known cheaply.
+  // Not reliable for security decisions: a decoder may disagree on crafted files
+  animated?: boolean;
+  pages?: number;
 };
 
 export type ISize = ImageMeta; // Reduce refactor for types/*
